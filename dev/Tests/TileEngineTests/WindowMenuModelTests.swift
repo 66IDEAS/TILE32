@@ -85,4 +85,12 @@ struct WindowMenuModelTests {
         )
         #expect(content.sections.first?.entries.map(\.text) == ["Mail - Inbox", "Safari - Apple  (minimised to make room)"])
     }
+
+    @Test func windowsThatDoNotFitAreMarked() {
+        let content = WindowMenuModel.build(
+            records: [record(1, app: "Slack", title: "General", display: dell)],
+            displays: displays, currentSpaces: [:], otherSpacesCount: 0, doesNotFit: [WindowID(1)]
+        )
+        #expect(content.sections.first?.entries.map(\.text) == ["Slack - General  (does not fit)"])
+    }
 }

@@ -137,6 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if coordinator?.state == .running, let counts = await coordinator?.counts() {
                 state.statusLine = Self.statusLine(counts)
                 state.notFitCount = counts.doesNotFit
+                // Fallback mode (US-12.7): without Space information only visible windows are arranged.
+                if !SkyLightSpaceService.shared.isAvailable {
+                    state.statusLine = "Spaces not detected - only visible windows are arranged"
+                }
             }
             menuBar?.update(state)
         }
@@ -188,8 +192,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let table = displayTable
         Task {
             let minimised = await engine.minimisedByEngine
+            let notFitting = await engine.doesNotFit
             let result = await WindowMenuLoader.load(apps: apps, displays: table, spaceService: SkyLightSpaceService.shared,
-                                                     minimisedToMakeRoom: minimised)
+                                                     minimisedToMakeRoom: minimised, doesNotFit: notFitting)
             listedWindows = result.windows
             menuBar?.setWindowContent(result.content)
             refreshingMenu = false

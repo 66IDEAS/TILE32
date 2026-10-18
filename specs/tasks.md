@@ -265,11 +265,12 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.5, T-1.4
 - **Progress:** full screen leaves with a return hint and comes back (test); a shown full-screen Space has no layout and is never touched.
 
-### [ ] T-1.8 Fallback mode without Space information
+### [~] T-1.8 Fallback mode without Space information
 - **Do:** When `SpaceService.isAvailable` is false, use the public on-screen window list, keep one tree per display, never write to windows that are not on screen, and show "Spaces not detected - only visible windows are arranged".
 - **Traces:** US-12.7, TA-16, UX-9
 - **Done when:** with the fake service set to unavailable, engine tests pass and the status line shows the fallback text; on the real machine a debug switch forces fallback mode without errors.
 - **Depends on:** T-1.5
+- **Result:** reconcile uses an unknown Space when the Space functions are missing (engine test), the status line says "Spaces not detected - only visible windows are arranged". Open: a debug switch to force fallback mode on the real machine.
 
 ### [~] T-1.9 Displays connected and disconnected
 - **Do:** On a display change, give a new display empty trees, move a removed display's windows to the remaining display with `appending`, and bring any window outside all displays into view.
@@ -278,11 +279,12 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.5
 - **Progress:** layouts of a disconnected display are dropped, and its windows join the remaining display (test).
 
-### [ ] T-1.10 Windows that cannot shrink
+### [~] T-1.10 Windows that cannot shrink
 - **Do:** After writing, compare the read-back size. Mark windows that stay larger as "does not fit", anchor them at the top-left of the tile, retry once, then leave them alone until their tile changes. Show the count next to the icon and in the status line, and "(does not fit)" in the Windows submenu.
 - **Traces:** US-10, TA-11, TA-12, UX-2, UX-6, UX-9
 - **Done when:** the FakeWindows minimum-size window in a small tile is marked, the count appears, no resize loop is logged, and the mark disappears when the tile grows.
 - **Depends on:** T-1.3, T-0.16
+- **Result:** engine marks and does not retry (reconcile test), badge and status line count only windows on the shown desktops, "(does not fit)" in the Windows submenu (test). Waiting for the M1 acceptance.
 
 ### [ ] T-1.11 Several and slow windows (spike S4)
 - **Do:** Test with FakeWindows (five windows at once, delayed window, splash-like window that closes quickly) and real apps. Tune coalescing, and make sure short-lived windows never enter a tree.
@@ -296,6 +298,8 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Done when:** engine tests cover every criterion of US-31, and on the real machine a 13th window on the Dell takes a tile while the least recently used one is minimised.
 - **Depends on:** T-0.26, T-1.3, T-1.4
 - **Progress:** reconcile swaps a new or returning window into the least recently used tile (front-to-back order as order of use), refills freed tiles with the last window TILE32 minimised, never brings back windows the user minimised (tests).
+- **Result:** live check on 2026-10-18 with FakeWindows and limit 3: a 4th window took the least recently used tile, a restored window swapped in, a closed window's tile was refilled. Waiting for the M1 acceptance with real apps.
+- **Errors found:** right after a swap, a reading during the minimise and restore animations saw the returning window as still minimised and swapped once more (flapping). Fixed: after a run that minimised, restored or took in a window, the next reading waits 800 ms. Re-run: exactly one cycle per step. Resolved 2026-10-18.
 
 ### [ ] T-1.12 Engine test coverage for M1
 - **Do:** Complete `TileEngineTests` with fakes for AX, geometry and Spaces for every M1 behaviour listed in TA-24 level 2.

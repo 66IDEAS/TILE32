@@ -20,6 +20,10 @@ public final class TilingCoordinator {
     static let pollInterval: TimeInterval = 1
     /// Move and resize events right after TILE32's own writes are its own echo (TA-12).
     static let echoWindow: Duration = .milliseconds(700)
+    /// Minimise and restore animations take about half a second; during them macOS can
+    /// still report the old state. After a run that minimised, restored or took in a window,
+    /// the next reading waits this long (found in the M1 window limit check: flapping).
+    static let settleTime: Duration = .milliseconds(800)
 
     public private(set) var state: RunState
     public private(set) var lastSummary = ReconcileSummary()
@@ -41,6 +45,7 @@ public final class TilingCoordinator {
     private var running = false
     private var runAgain = false
     private var lastWrite: ContinuousClock.Instant = .now - .seconds(10)
+    private var lastAnimation: ContinuousClock.Instant = .now - .seconds(10)
 
     /// `onlyBundleIDs` limits tiling to some apps; used by test runs on FakeWindows.
     public init(engine: LayoutEngine, spaceService: SpaceService, initialState: RunState,
@@ -146,6 +151,11 @@ public final class TilingCoordinator {
                 scheduleCheck()
                 return
             }
+            // Let minimise and restore animations finish first.
+            if now - lastAnimation < Self.settleTime {
+                scheduleCheck()
+                return
+            }
             // Never while the user holds the mouse button: a drag or resize is in progress.
             if NSEvent.pressedMouseButtons & 1 != 0 {
                 scheduleCheck()
@@ -169,6 +179,7 @@ public final class TilingCoordinator {
             let observation = await observe()
             let summary = await engine.reconcile(observation, limits: limits())
             if summary.changedAnything { lastWrite = .now }
+            if summary.minimised > 0 || summary.restored > 0 || summary.arrived > 0 { lastAnimation = .now }
             lastSummary = summary
             onChange()
         } while runAgain && state == .running
