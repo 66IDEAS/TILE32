@@ -77,21 +77,40 @@ public actor LayoutEngine {
     public static let expectationWindow: Duration = .milliseconds(500)
     /// Frame differences below this are noise (TA-12).
     public static let frameTolerance: CGFloat = 2
+    /// How often TILE32 puts back a window that moved away from its tile, before leaving it
+    /// alone until its tile changes (TA-12: never fight an app).
+    public static let maximumRetries = 1
 
-    public private(set) var trees: [LayoutKey: LayoutTree] = [:]
-    public private(set) var doesNotFit: Set<WindowID> = []
+    public internal(set) var trees: [LayoutKey: LayoutTree] = [:]
+    public internal(set) var doesNotFit: Set<WindowID> = []
     /// Windows TILE32 minimised to respect a window limit (rule L9). Windows the user
     /// minimised are never in here, so TILE32 never brings those back (US-31.8).
-    public private(set) var minimisedByEngine: Set<WindowID> = []
-    /// Each window's frame before TILE32 first moved or minimised it (TA-18), with the
-    /// snapshot needed to write it back.
-    private var originals: [WindowID: (window: WindowSnapshot, frame: CGRect)] = [:]
+    public internal(set) var minimisedByEngine: Set<WindowID> = []
 
     /// True when "Untile" has something to restore (US-24.6).
     public var canUntile: Bool { !originals.isEmpty }
-    private var expected: [WindowID: ExpectedFrame] = [:]
-    private var generation: UInt64 = 0
-    private let writer: FrameWriting
+
+    // Internal state, shared with the reconcile step in Reconcile.swift.
+    /// Each window's frame before TILE32 first moved or minimised it (TA-18), with the
+    /// snapshot needed to write it back.
+    var originals: [WindowID: (window: WindowSnapshot, frame: CGRect)] = [:]
+    var expected: [WindowID: ExpectedFrame] = [:]
+    var generation: UInt64 = 0
+    let writer: FrameWriting
+    /// The tile each window was last written to; a window is only written again when its
+    /// tile changes or it moved away from it (TA-12).
+    var lastTile: [WindowID: CGRect] = [:]
+    /// Put-backs per window for its current tile (TA-12).
+    var retries: [WindowID: Int] = [:]
+    /// Where a window that left a layout (minimised, hidden, full screen) comes back (TA-9).
+    var returnHints: [WindowID: (hint: ReturnHint, key: LayoutKey)] = [:]
+    /// The layout a window minimised by TILE32 belongs to, and the order of minimising
+    /// (most recent last), so freed tiles are refilled in the right order (US-31.6).
+    var minimisedKeys: [WindowID: LayoutKey] = [:]
+    var minimisedOrder: [WindowID] = []
+    var minimisedSnapshots: [WindowID: WindowSnapshot] = [:]
+    /// The app of every window seen, to keep windows of apps that did not answer.
+    var windowPIDs: [WindowID: pid_t] = [:]
 
     public init(writer: FrameWriting = AXFrameWriter()) {
         self.writer = writer
@@ -107,8 +126,8 @@ public actor LayoutEngine {
         public var minimised: Int = 0
     }
 
-    /// "Tile now" (US-4): equal columns per Space and display, ordered by each window's
-    /// current left edge, inside the display's usable area. Floating, minimised and
+    /// "Tile now" (US-4): a fresh arrangement (rule L2) of every shown layout, ordered by each
+    /// window's current left edge, with the window limit (rule L9). Floating, minimised and
     /// full-screen windows are not touched; no window changes display (US-4.2).
     public func tileNow(
         records: [WindowRecord],
@@ -118,54 +137,21 @@ public actor LayoutEngine {
         recency: [WindowID] = [],
         excludedBundleIDs: Set<String> = []
     ) async -> TileSummary {
-        let tiled = records.filter { WindowClassifier.classify($0.snapshot, excludedBundleIDs: excludedBundleIDs) == .tiled }
-
-        var groups: [LayoutKey: [WindowRecord]] = [:]
-        for record in tiled {
-            guard let displayID = record.display else { continue }
-            groups[LayoutKey(space: currentSpaces[displayID]?.id, display: displayID), default: []].append(record)
-        }
-
-        // Remember where every window was before TILE32 touches it (TA-18).
-        for record in tiled where originals[record.id] == nil {
-            if let frame = record.snapshot.frame { originals[record.id] = (record.snapshot, frame) }
-        }
-
-        // Most recently used first (TA-27); windows the order does not know come last.
-        let rank = Dictionary(recency.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-        var batch: [FrameAssignment] = []
-        var toMinimise: [(WindowID, WindowSnapshot)] = []
-        for (key, all) in groups {
-            guard let display = displays.display(id: key.display) else { continue }
-            let byUse = all.sorted { (rank[$0.id] ?? .max, $0.id.raw) < (rank[$1.id] ?? .max, $1.id.raw) }
-            let limit = limits.limit(for: display)
-            let members = Array(byUse.prefix(limit))
-            toMinimise += byUse.dropFirst(limit).map { ($0.id, $0.snapshot) }
-            let ordered = members.sorted { ($0.snapshot.frame?.minX ?? 0, $0.id.raw) < ($1.snapshot.frame?.minX ?? 0, $1.id.raw) }
-            let tree = LayoutTree.arranged(ordered.map(\.id), availableWidth: display.usableArea.width - Self.gap)
-            trees[key] = tree
-            let frames = tree.frames(in: display.usableArea, gap: Self.gap)
-            for record in ordered {
-                if let frame = frames[record.id] { batch.append(FrameAssignment(id: record.id, window: record.snapshot, frame: frame)) }
-            }
-        }
-        var summary = await apply(batch, layouts: groups.count)
-        if !toMinimise.isEmpty {
-            let failed = await writer.setMinimised(toMinimise, true)
-            let done = Set(toMinimise.map(\.0)).subtracting(failed)
-            minimisedByEngine.formUnion(done)
-            summary.minimised = done.count
-            Log.layout.info("Minimised \(done.count) windows to make room, \(failed.count) failed")
-        }
-        return summary
+        let observation = Observation(records: records, displays: displays, currentSpaces: currentSpaces, recency: recency)
+        let summary = await reconcile(observation, limits: limits, excludedBundleIDs: excludedBundleIDs, rebuild: true)
+        return TileSummary(layouts: summary.layouts, windows: summary.written, matched: summary.matched,
+                           doesNotFit: summary.doesNotFit, failed: summary.failed, minimised: summary.minimised)
     }
 
-    /// Writes a batch, remembers the expected frames, and marks windows that do not fit (US-10).
-    private func apply(_ batch: [FrameAssignment], layouts: Int) async -> TileSummary {
+    /// Writes a batch, remembers the expected frames and tiles, and marks windows that do not
+    /// fit (US-10). Returns how many fitted, did not fit, and failed.
+    func apply(_ batch: [FrameAssignment]) async -> (matched: Int, doesNotFit: Int, failed: Int) {
+        guard !batch.isEmpty else { return (0, 0, 0) }
         generation += 1
         let deadline = ContinuousClock.now + Self.expectationWindow
         for item in batch {
             expected[item.id] = ExpectedFrame(frame: item.frame, generation: generation, deadline: deadline)
+            lastTile[item.id] = item.frame
         }
 
         let results = await writer.write(batch)
@@ -181,9 +167,34 @@ public actor LayoutEngine {
                 if result.fits { matched += 1 } else { failed += 1 }
             }
         }
-        let summary = TileSummary(layouts: layouts, windows: batch.count, matched: matched, doesNotFit: notFitting, failed: failed)
-        Log.layout.info("Tiled \(summary.windows) windows in \(summary.layouts) layouts: \(matched) matched, \(notFitting) do not fit, \(failed) failed")
-        return summary
+        Log.layout.info("Wrote \(batch.count) frames: \(matched) fit, \(notFitting) do not fit, \(failed) failed")
+        return (matched, notFitting, failed)
+    }
+
+    /// Minimises windows to make room and remembers which layout they belong to (rule L9).
+    func minimise(_ windows: [(WindowID, WindowSnapshot, LayoutKey)]) async -> Int {
+        guard !windows.isEmpty else { return 0 }
+        let failed = await writer.setMinimised(windows.map { ($0.0, $0.1) }, true)
+        var done = 0
+        for (id, snapshot, key) in windows where !failed.contains(id) {
+            minimisedByEngine.insert(id)
+            minimisedKeys[id] = key
+            minimisedSnapshots[id] = snapshot
+            minimisedOrder.removeAll { $0 == id }
+            minimisedOrder.append(id)
+            lastTile[id] = nil
+            done += 1
+        }
+        Log.layout.info("Minimised \(done) windows to make room, \(failed.count) failed")
+        return done
+    }
+
+    /// Forgets that TILE32 minimised a window (it came back, or it is gone).
+    func forgetMinimised(_ id: WindowID) {
+        minimisedByEngine.remove(id)
+        minimisedKeys[id] = nil
+        minimisedSnapshots[id] = nil
+        minimisedOrder.removeAll { $0 == id }
     }
 
     public struct UntileSummary: Sendable, Equatable {
@@ -194,10 +205,13 @@ public actor LayoutEngine {
 
     /// "Untile" (US-24): brings back the windows TILE32 minimised, writes every original
     /// frame back (moved into view if its display is gone), and forgets all layouts.
+    /// Windows on hidden desktops are restored too, through the element read while they
+    /// were visible (session A).
     public func untile(displays: DisplayTable) async -> UntileSummary {
-        let toRestore = minimisedByEngine.compactMap { id in originals[id].map { (id, $0.window) } }
+        let toRestore = minimisedByEngine.compactMap { id in
+            (minimisedSnapshots[id] ?? originals[id]?.window).map { (id, $0) }
+        }
         let failedRestore = await writer.setMinimised(toRestore, false)
-        minimisedByEngine.removeAll()
 
         let batch = originals.map { id, original in
             FrameAssignment(id: id, window: original.window, frame: displays.clampedIntoView(original.frame))
@@ -213,6 +227,13 @@ public actor LayoutEngine {
         originals.removeAll()
         trees.removeAll()
         doesNotFit.removeAll()
+        minimisedByEngine.removeAll()
+        minimisedKeys.removeAll()
+        minimisedOrder.removeAll()
+        minimisedSnapshots.removeAll()
+        lastTile.removeAll()
+        retries.removeAll()
+        returnHints.removeAll()
         let summary = UntileSummary(restored: batch.count - failed, unminimised: toRestore.count - failedRestore.count,
                                     failed: failed + failedRestore.count)
         Log.layout.info("Untile: \(summary.restored) restored, \(summary.unminimised) brought back, \(summary.failed) failed")
@@ -224,12 +245,15 @@ public actor LayoutEngine {
     public func isSelfCaused(_ id: WindowID, frame: CGRect, at instant: ContinuousClock.Instant = .now) -> Bool {
         guard let expectation = expected[id] else { return false }
         if instant <= expectation.deadline { return true }
-        let a = expectation.frame
-        return abs(a.minX - frame.minX) <= Self.frameTolerance && abs(a.minY - frame.minY) <= Self.frameTolerance
-            && abs(a.width - frame.width) <= Self.frameTolerance && abs(a.height - frame.height) <= Self.frameTolerance
+        return Self.close(expectation.frame, frame)
     }
 
     public func expectedFrame(of id: WindowID) -> ExpectedFrame? {
         expected[id]
+    }
+
+    static func close(_ a: CGRect, _ b: CGRect, tolerance: CGFloat = frameTolerance) -> Bool {
+        abs(a.minX - b.minX) <= tolerance && abs(a.minY - b.minY) <= tolerance
+            && abs(a.width - b.width) <= tolerance && abs(a.height - b.height) <= tolerance
     }
 }

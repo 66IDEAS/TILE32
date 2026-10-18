@@ -226,3 +226,30 @@ struct ArrangedTests {
         #expect(LayoutTree.arranged([], availableWidth: 5108).isEmpty)
     }
 }
+
+@Suite("Return hints (US-8.2)")
+struct ReturnHintTests {
+    @Test func windowComesBackToTheSameSide() {
+        let tree = LayoutTree.flat([A, B, C]).appending(D).dropping(D, on: A, zone: .bottom)   // H(V(A,D),B,C)
+        let hint = tree.returnHint(for: D)
+        #expect(hint == ReturnHint(sibling: A, zone: .bottom))
+        let back = tree.removing(D).splitting(target: A, with: D, zone: hint!.zone)
+        #expect(shape(back) == shape(tree))
+    }
+
+    @Test func firstWindowUsesItsFollowingNeighbour() {
+        #expect(LayoutTree.flat([A, B, C]).returnHint(for: A) == ReturnHint(sibling: B, zone: .left))
+        #expect(LayoutTree.flat([A, B, C]).returnHint(for: C) == ReturnHint(sibling: B, zone: .right))
+    }
+
+    @Test func neighbourInsideAGroupIsItsNearestWindow() {
+        // H(A, V(B, D)): A's neighbour is the group; its first window is B.
+        let tree = LayoutTree.flat([A, B]).dropping(D, on: B, zone: .bottom)
+        #expect(tree.returnHint(for: A) == ReturnHint(sibling: B, zone: .left))
+    }
+
+    @Test func aloneOrMissingHasNoHint() {
+        #expect(LayoutTree(root: leaf(A)).returnHint(for: A) == nil)
+        #expect(LayoutTree.flat([A, B]).returnHint(for: E) == nil)
+    }
+}
