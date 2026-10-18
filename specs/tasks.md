@@ -399,11 +399,12 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 
 Goal: safe and pleasant for every day use, and ready to be given to others.
 
-### [ ] T-3.1 Classification complete
+### [x] T-3.1 Classification complete
 - **Do:** Re-run classification when a window's title, subrole or size changes; handle sheets and windows that change nature after creation; show all floating reasons from UX-6.
 - **Traces:** US-21, TA-10, UX-6
 - **Done when:** the FakeWindows dialog, sheet and tool window never take a tile, and their reasons are shown correctly.
 - **Depends on:** T-1.12
+- **Result:** classification runs on every reconcile, so windows that change nature are re-classified at once; sheets belong to their parent window and never take a tile; open and save panels report an ordinary standard window but carry the identifier "save-panel" or "open-panel" and now float as dialogs even when resizable (found with FakeWindows, 2 tests); every floating reason of UX-6 is shown in the Windows submenu. Done 2026-10-18.
 
 ### [~] T-3.2 Exclude apps
 - **Do:** Add "Don't tile <app>" / "Tile <app> again" / "Don't tile an app", and the "Excluded apps" submenu with its header and empty state. Store bundle identifiers in `UserDefaults`.
@@ -412,12 +413,13 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Depends on:** T-3.1
 - **Progress:** `ExcludedAppsStore` (UserDefaults, most recently added last, test), "Don't tile <app>" / "Tile <app> again" / "Don't tile an app" for the app in front when the menu is built, "Excluded apps" submenu with its header and empty state, the list passed to every reconcile and to "Tile now"; reconcile test: an excluded app's window floats where it is, the others close the gap, including it again brings it back. Waiting for the owner check (for example with Zoom).
 
-### [~] T-3.3 Untile
+### [x] T-3.3 Untile
 - **Do:** Restore the recorded original frames, clamp them to visible display areas, restore windows on hidden Spaces when their Space is next shown, then pause. "Untile" is available while running and paused, and grey only when there is nothing to restore.
 - **Traces:** US-24, TA-18, UX-4, UX-9
 - **Done when:** after tiling and rearranging, "Untile" puts every window back within two seconds on the visible Spaces, the status line reads "Windows restored - tiling paused", and windows on other Spaces are restored on their next visit.
 - **Progress (built early, in M0):** moved forward so that the owner's windows can always be restored before "Tile now" is switched on for them (UX-1 principle 2). Done: original frames recorded before the first move (TA-18), "Untile" menu item, windows minimised to make room brought back (US-24.8), frames moved into view when their display is gone (`DisplayTable.clampedIntoView`, US-24.3), layouts forgotten afterwards, status line "Windows restored - tiling paused". 3 new tests. Real check on 2026-10-18 with `--tile-then-untile-fakewindows` (FakeWindows only, limit 4): all six windows came back to their exact positions and sizes, including the two that had been minimised. Open for M1 and M3: the paused state after Untile (needs T-1.1), availability while paused, and windows on hidden Spaces restored on their next visit (US-24.7).
 - **Depends on:** T-1.5
+- **Result:** pause after Untile, availability while paused (grey only when nothing is left to restore), and the status line were built in M1. Windows on hidden desktops are restored at once through the element TILE32 read while they were visible (session A showed that such writes work); only a window TILE32 never saw would wait for its next visit (US-24.7). Done 2026-10-18.
 
 ### [~] T-3.4 Start at login
 - **Do:** The "Start at login" checkbox with `SMAppService.mainApp`, showing the system's real state and the "(approve in System Settings)" variant.
@@ -426,11 +428,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Depends on:** T-0.10
 - **Progress:** checkbox with `SMAppService.mainApp`, showing the system's state, and the "(approve in System Settings)" variant that opens the login items settings. Not switched on by Claude, because it changes the owner's login items. Waiting for the owner: switch on, log out and in.
 
-### [ ] T-3.5 Permission revoked
+### [~] T-3.5 Permission revoked
 - **Do:** When the permission disappears: stop all writes, reset the tracker, hide the overlay, release the observers, and show the warning menu. Resume without a restart when it returns.
 - **Traces:** US-27, TA-8, flow 3.8, UX-5
 - **Done when:** removing TILE32 from the Accessibility list while it runs leaves all windows in place and shows the warning within 2 seconds, and re-adding it resumes tiling.
 - **Depends on:** T-1.1
+- **Result:** the permission monitor switches the coordinator to "no permission" (no reconcile, no drop, no resize), stops the drag tracker, hides the overlay, and shows the warning menu; it resumes without a restart when the permission returns (paths built in M0 and M1). Claude does not remove the permission itself (security setting). Waiting for the owner check: remove TILE32 from the Accessibility list while it runs, then add it again.
 
 ### [ ] T-3.6 Accessibility of TILE32 itself
 - **Do:** Check the VoiceOver labels and values, section headers in the Windows submenu, and the polite announcement of overlay labels if it is cheap (UQ-2). Check the label contrast with every macOS accent colour (UQ-3).

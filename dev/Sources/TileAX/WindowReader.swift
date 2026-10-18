@@ -41,6 +41,8 @@ public struct WindowSnapshot: Sendable {
     public let isFullScreen: Bool
     public let isModal: Bool
     public let isResizable: Bool
+    /// The window's Accessibility identifier, for example "save-panel" (T-3.1).
+    public var identifier: String? = nil
 }
 
 /// The result of reading one app, including how long it took and whether it answered.
@@ -103,7 +105,8 @@ public enum WindowReader {
                 isMinimized: AXRead.bool(element, kAXMinimizedAttribute) ?? false,
                 isFullScreen: AXRead.bool(element, "AXFullScreen") ?? false,
                 isModal: AXRead.bool(element, kAXModalAttribute) ?? false,
-                isResizable: AXRead.isSettable(element, kAXSizeAttribute)
+                isResizable: AXRead.isSettable(element, kAXSizeAttribute),
+                identifier: AXRead.string(element, kAXIdentifierAttribute)
             )
         }
         let duration = clock.now - start

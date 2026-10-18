@@ -380,7 +380,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 4. After "Untile", TILE32 is paused. The user resumes with "Resume tiling" (US-23).
 5. "Untile" works even when many windows are open and takes effect within two seconds.
 6. "Untile" is also available while tiling is paused, because pausing leaves the windows in their tiled positions. It is unavailable only when there is nothing to restore, for example right after an "Untile".
-7. Windows on Spaces that are not shown are restored the next time their Space is shown, because TILE32 never moves windows on hidden Spaces (US-12.3).
+7. Windows on Spaces that are not shown are restored at once, as long as TILE32 saw them before (session A showed that this works). A window TILE32 never saw is restored the next time its Space is shown.
 8. Windows that TILE32 minimised because of the window limit (US-31) are brought back and restored to their original frames as well.
 
 #### US-25 Start at login

@@ -25,6 +25,9 @@ public enum WindowClassifier {
     public static let minimumSize = CGSize(width: 200, height: 120)
 
     private static let dialogSubroles: Set<String> = ["AXDialog", "AXSystemDialog"]
+    /// Open and save panels report an ordinary standard window, but carry these
+    /// identifiers (found in T-3.1 with FakeWindows).
+    private static let dialogIdentifiers: Set<String> = ["save-panel", "open-panel"]
 
     /// Rule 1 (regular apps only) is applied by discovery: other apps are never read.
     public static func classify(_ window: WindowSnapshot, excludedBundleIDs: Set<String> = []) -> Classification {
@@ -33,7 +36,9 @@ public enum WindowClassifier {
         }
         if window.isMinimized { return .minimised }
         if window.isFullScreen { return .floating(.fullScreen) }
-        if window.isModal || dialogSubroles.contains(window.subrole ?? "") { return .floating(.dialog) }
+        if window.isModal || dialogSubroles.contains(window.subrole ?? "") || dialogIdentifiers.contains(window.identifier ?? "") {
+            return .floating(.dialog)
+        }
         // Rule 2: only standard windows. Floating panels, sheets, popovers and unknown
         // helper windows all fall out here.
         guard window.role == "AXWindow", window.subrole == "AXStandardWindow" else { return .floating(.panel) }

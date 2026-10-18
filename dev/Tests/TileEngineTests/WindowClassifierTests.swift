@@ -12,13 +12,15 @@ private func window(
     minimised: Bool = false,
     fullScreen: Bool = false,
     modal: Bool = false,
-    resizable: Bool = true
+    resizable: Bool = true,
+    identifier: String? = nil
 ) -> WindowSnapshot {
     WindowSnapshot(
         app: AppInfo(pid: 4242, bundleID: bundleID, name: "Example"),
         element: AXElementBox(AXUIElementCreateApplication(4242)),
         windowNumber: 1, role: role, subrole: subrole, title: "", frame: frame,
-        isMinimized: minimised, isFullScreen: fullScreen, isModal: modal, isResizable: resizable
+        isMinimized: minimised, isFullScreen: fullScreen, isModal: modal, isResizable: resizable,
+        identifier: identifier
     )
 }
 
@@ -69,5 +71,10 @@ struct WindowClassifierTests {
         let excluded: Set<String> = ["us.zoom.xos"]
         #expect(WindowClassifier.classify(window(bundleID: "us.zoom.xos", minimised: true), excludedBundleIDs: excluded) == .floating(.excludedApp))
         #expect(WindowClassifier.classify(window(bundleID: "com.apple.Safari"), excludedBundleIDs: excluded) == .tiled)
+    }
+
+    @Test(arguments: ["save-panel", "open-panel"])
+    func openAndSavePanelsFloatAsDialogsEvenWhenResizable(identifier: String) {
+        #expect(WindowClassifier.classify(window(identifier: identifier)) == .floating(.dialog))
     }
 }
