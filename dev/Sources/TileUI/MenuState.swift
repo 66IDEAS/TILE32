@@ -1,6 +1,7 @@
 // What the menu bar shows. The menu displays this state and sends commands; it makes no
 // layout decisions itself (architecture TA-17, constitution technical rule 6).
 import Foundation
+import TileCore
 
 /// The three icon states of UX-2. They differ by shape, never by colour.
 public enum IconState: Sendable, Equatable {
@@ -46,6 +47,10 @@ public struct MenuState: Sendable, Equatable {
 /// Commands the menu sends. The app wires them to the engine.
 public struct MenuActions {
     public var tileNow: @MainActor () -> Void
+    /// The menu is about to open: a good moment to refresh the window list (US-3.3).
+    public var menuWillOpen: @MainActor () -> Void
+    /// The user chose a window in the "Windows" submenu (US-3.4).
+    public var raiseWindow: @MainActor (WindowID) -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -55,6 +60,8 @@ public struct MenuActions {
 
     public init(
         tileNow: @escaping @MainActor () -> Void,
+        menuWillOpen: @escaping @MainActor () -> Void = {},
+        raiseWindow: @escaping @MainActor (WindowID) -> Void = { _ in },
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -63,6 +70,8 @@ public struct MenuActions {
         diagnostics: @escaping @MainActor () -> String
     ) {
         self.tileNow = tileNow
+        self.menuWillOpen = menuWillOpen
+        self.raiseWindow = raiseWindow
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces

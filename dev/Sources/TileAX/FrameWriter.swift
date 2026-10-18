@@ -67,3 +67,13 @@ public enum FrameWriter {
         return AXUIElementSetAttributeValue(element, attribute as CFString, value)
     }
 }
+
+public enum WindowActions {
+    /// Brings one window to the front of its app (US-3.4). Blocking; runs on the app's queue.
+    /// The caller then activates the app, so the window ends up in front of everything.
+    public static func raise(_ window: AXElementBox) -> AXError {
+        AXUIElementSetMessagingTimeout(window.element, AXWorker.messagingTimeout)
+        AXUIElementSetAttributeValue(window.element, kAXMainAttribute as CFString, kCFBooleanTrue)
+        return AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
+    }
+}

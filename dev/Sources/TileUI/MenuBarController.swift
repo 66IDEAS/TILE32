@@ -1,5 +1,7 @@
 // The status item and its menu (architecture TA-17, UX-2, UX-3, UX-14).
 import AppKit
+import TileCore
+import TileEngine
 import TileLog
 
 @MainActor
@@ -8,6 +10,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let actions: MenuActions
     private var state: MenuState
+    /// Kept across rebuilds so it can be refreshed while the menu is open.
+    private let windowsSubmenu = NSMenu()
+    private var windowContent = WindowMenuContent.empty
 
     public init(state: MenuState, actions: MenuActions) {
         self.state = state
@@ -21,6 +26,18 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         statusItem.button?.setAccessibilityLabel("TILE32")
         statusItem.button?.setAccessibilityHelp("Opens the TILE32 menu")
         applyIcon()
+    }
+
+    /// New window list; updates the submenu in place, also while it is open.
+    public func setWindowContent(_ content: WindowMenuContent) {
+        guard content != windowContent else { return }
+        windowContent = content
+        fillWindowsSubmenu()
+    }
+
+    public func menuWillOpen(_ menu: NSMenu) {
+        guard menu === self.menu else { return }
+        actions.menuWillOpen()
     }
 
     public func update(_ newState: MenuState) {
@@ -74,15 +91,40 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         })
     }
 
-    /// Filled with real windows in task T-0.23. Until then it shows the empty state of UX-6.
     private func windowsItem() -> NSMenuItem {
         let item = NSMenuItem(title: "Windows", action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-        submenu.addItem(disabledItem("No windows to arrange"))
-        item.submenu = submenu
+        windowsSubmenu.autoenablesItems = false
+        fillWindowsSubmenu()
+        item.submenu = windowsSubmenu
         // Grey while the permission is missing (UX-6).
         item.isEnabled = !state.needsPermission
+        return item
+    }
+
+    /// Display groups with headers, then floating windows, then the count on other Spaces (UX-6).
+    private func fillWindowsSubmenu() {
+        windowsSubmenu.removeAllItems()
+        if windowContent.isEmpty {
+            windowsSubmenu.addItem(disabledItem("No windows to arrange"))
+        }
+        for section in windowContent.sections {
+            windowsSubmenu.addItem(NSMenuItem.sectionHeader(title: section.header))
+            for entry in section.entries { windowsSubmenu.addItem(windowItem(entry)) }
+        }
+        if !windowContent.floating.isEmpty {
+            windowsSubmenu.addItem(NSMenuItem.sectionHeader(title: "Floating"))
+            for entry in windowContent.floating { windowsSubmenu.addItem(windowItem(entry)) }
+        }
+        if windowContent.otherSpacesCount > 0 {
+            let count = windowContent.otherSpacesCount
+            windowsSubmenu.addItem(.separator())
+            windowsSubmenu.addItem(disabledItem("\(count) \(count == 1 ? "window" : "windows") on other Spaces"))
+        }
+    }
+
+    private func windowItem(_ entry: WindowMenuEntry) -> NSMenuItem {
+        let item = ActionMenuItem(title: entry.text) { [actions] in actions.raiseWindow(entry.id) }
+        item.indentationLevel = 1
         return item
     }
 

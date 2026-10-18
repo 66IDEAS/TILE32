@@ -1,6 +1,7 @@
 // Wires the modules together. Holds no layout logic (architecture TA-2, TA-17).
 import AppKit
 import TileAX
+import TileCore
 import TileEngine
 import TileGeometry
 import TileInput
@@ -15,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permission: PermissionMonitor?
     private var spaces: SpaceMonitor?
     private var dragTracker: MouseDragTracker?
+    /// The windows behind the last "Windows" submenu, so a choice can raise the right one.
+    private var listedWindows: [WindowID: WindowSnapshot] = [:]
+    private var refreshingMenu = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -55,6 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state: Self.menuState(permissionGranted: permission.isGranted),
             actions: MenuActions(
                 tileNow: { Log.layout.info("Tile now chosen; arranging windows arrives in task T-0.24") },
+                menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
+                raiseWindow: { [weak self] id in self?.raise(id) },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -69,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         updateDragLogging(granted: permission.isGranted)
+        refreshWindowMenu()
 
         // The first-run explanation, once per launch while the permission is missing (UX-8).
         if !permission.isGranted {
@@ -151,6 +158,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let displays = self.displays?.table ?? DisplayTable(screens: [])
         await FrameWriteTest.run(apps: AppInfo.runningRegularApps(), displays: displays,
                                  spaceService: SkyLightSpaceService.shared, onlyBundleID: onlyBundleID)
+    }
+
+    /// Reads the windows again whenever the menu opens; the submenu updates while open (US-3.3).
+    private func refreshWindowMenu() {
+        guard AccessibilityPermission.isGranted, !refreshingMenu else { return }
+        refreshingMenu = true
+        let apps = AppInfo.runningRegularApps()
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        Task {
+            let result = await WindowMenuLoader.load(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
+            listedWindows = result.windows
+            menuBar?.setWindowContent(result.content)
+            refreshingMenu = false
+        }
+    }
+
+    /// Brings the chosen window to the front (US-3.4).
+    private func raise(_ id: WindowID) {
+        guard let snapshot = listedWindows[id] else { return }
+        let pid = snapshot.app.pid
+        Task {
+            let error = await AXWorker.shared.run(for: pid) { WindowActions.raise(snapshot.element) }
+            if error != .success {
+                Log.ax.info("Raising \(id.description, privacy: .public) failed: AXError \(error.rawValue)")
+            }
+            NSRunningApplication(processIdentifier: pid)?.activate()
+        }
     }
 
     private func permissionChanged(_ granted: Bool) {

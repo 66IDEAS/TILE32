@@ -173,10 +173,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Done when:** `specs/spikes.md` records the classification accuracy per app, the false positives, and whether Escape works with the Accessibility permission alone (OQ-1 answered).
 - **Depends on:** T-0.21
 
-### [ ] T-0.23 Windows submenu
+### [~] T-0.23 Windows submenu
 - **Do:** Fill the "Windows" submenu: headers "<display name> - Desktop <n>", entries "App - title" (cut in the middle at about 48 characters), a "Floating" group with reasons, "<n> windows on other Spaces", and "No windows to arrange". Choosing an entry brings the window to the front.
 - **Traces:** US-3, UX-6, UX-15
 - **Done when:** the submenu matches UX-6 for the current setup, and choosing an entry raises that window.
+- **Progress:** `WindowMenuModel` (pure, 5 tests) and `WindowMenuLoader` in `TileEngine`; the submenu is refreshed every time the menu opens and updates in place while open; section headers use macOS section headers (also read by VoiceOver); choosing an entry raises the window and activates its app. Minimised windows are not listed (US-8.3). Waiting for the owner to look at the submenu and choose an entry.
 - **Depends on:** T-0.15, T-0.13
 
 ### [ ] T-0.24 Tile now (first engine)
