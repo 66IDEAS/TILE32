@@ -1,6 +1,7 @@
 // Wires the modules together. Holds no layout logic (architecture TA-2, TA-17).
 import AppKit
 import TileAX
+import TileEngine
 import TileGeometry
 import TileLog
 import TileSpaces
@@ -18,6 +19,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.ui.info("TILE32 \(version, privacy: .public) started")
 
         displays = DisplayMonitor { _ in }
+        #if DEBUG
+        // Debug builds only: `open -n TILE32.app --args --dump-windows` logs every window and
+        // quits, without a menu-bar icon. Lets Claude check readings without opening menus.
+        if CommandLine.arguments.contains("--dump-windows") {
+            startSpaceMonitor()
+            runDumpAndQuit()
+            return
+        }
+        #endif
         startSpaceMonitor()
         let permission = PermissionMonitor { [weak self] granted in self?.permissionChanged(granted) }
         self.permission = permission
@@ -31,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     AccessibilityPermission.request()
                     AccessibilityPermission.openSettings()
                 },
-                dumpLayoutTrees: { Log.layout.info("No layout trees yet; the engine arrives in task T-0.24") },
+                dumpLayoutTrees: { [weak self] in self?.dumpWindows() },
                 diagnostics: { [weak self] in self?.diagnostics() ?? "" }
             )
         )
@@ -60,6 +70,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.logCurrentSpaces()
         spaces = monitor
     }
+
+    /// Until the engine exists (T-0.24) there are no trees; this lists every window with its
+    /// number, display and Space (T-0.14).
+    private func dumpWindows() {
+        guard AccessibilityPermission.isGranted else {
+            Log.layout.info("Dump skipped: Accessibility permission missing")
+            return
+        }
+        let apps = AppInfo.runningRegularApps()
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        Task {
+            let result = await WindowScan.run(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
+            WindowScan.log(result, displays: displays)
+        }
+    }
+
+    #if DEBUG
+    private func runDumpAndQuit() {
+        let apps = AppInfo.runningRegularApps()
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        Log.layout.info("Dump mode: permission \(AccessibilityPermission.isGranted ? "granted" : "missing", privacy: .public)")
+        Task {
+            let result = await WindowScan.run(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
+            WindowScan.log(result, displays: displays)
+            NSApp.terminate(nil)
+        }
+    }
+    #endif
 
     private func permissionChanged(_ granted: Bool) {
         menuBar?.update(Self.menuState(permissionGranted: granted))

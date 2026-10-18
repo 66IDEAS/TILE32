@@ -112,10 +112,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** on macOS 27.0.1 (26A434) all four functions were found under their SkyLight names (`SLSMainConnectionID`, `SLSCopyManagedDisplaySpaces`, `SLSCopySpacesForWindows`, `_AXUIElementGetWindow`). The log shows the current Space of both displays. `FakeSpaceService` lives in `TileSpaces` so engine tests can use it; 6 parser and mapping tests in the new `TileSpacesTests` target. Done 2026-10-18.
 - **Depends on:** T-0.8, T-0.9
 
-### [ ] T-0.14 TileAX: access layer and window registry
+### [~] T-0.14 TileAX: access layer and window registry
 - **Do:** Implement the AX observer thread with its own run loop, one serial queue per app, `AXUIElementSetMessagingTimeout` (0.5 s), the `@unchecked Sendable` element box, discovery of regular apps, reading windows and their attributes (role, subrole, title, frame, minimised, full screen, modal, size settable), and a registry keyed by `CGWindowID` (from T-0.13), with `CFEqual` as the fallback key.
 - **Traces:** TA-9, TA-13, TA-20, N-3, N-5
 - **Done when:** "Dump layout trees" lists every window of the running apps with its `CGWindowID`, display and Space, and a deliberately hung test app does not freeze TILE32.
+- **Progress:** `AXWorker` (queue per app, 0.5 s timeout, observer thread), `WindowReader`, `AXElementBox`, `WindowRegistry` and `WindowScan`. Debug builds can be started with `--dump-windows` to log every window and quit, so readings can be checked without opening menus. First reading on 2026-10-18: 31 windows in 37 apps in 662 ms, each with window number, display and Space (`specs/spikes.md`, S3). Open: the hung-app check, which needs the hang button of FakeWindows (T-0.16).
 - **Depends on:** T-0.12, T-0.13
 
 ### [ ] T-0.15 Window classification, first version
