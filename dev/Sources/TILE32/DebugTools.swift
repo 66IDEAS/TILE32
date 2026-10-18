@@ -92,21 +92,6 @@ extension AppDelegate {
     }
 
     #if DEBUG
-    /// Spike S1: every press, drag and resize is logged while the permission is granted.
-    func updateDragLogging(granted: Bool) {
-        if granted {
-            if dragTracker == nil {
-                dragTracker = MouseDragTracker(
-                    displays: { [weak self] in self?.displayTable ?? DisplayTable(screens: []) },
-                    describe: { number, pid in await Self.describeWindow(number: number, pid: pid) }
-                )
-            }
-            dragTracker?.start()
-        } else {
-            dragTracker?.stop()
-        }
-    }
-
     /// App name and TILE32's classification of one window, for the S1 log.
     static func describeWindow(number: CGWindowID, pid: pid_t) async -> String {
         guard let running = NSRunningApplication(processIdentifier: pid) else { return "pid \(pid)" }
@@ -176,6 +161,8 @@ extension AppDelegate {
             )
             self.coordinator = coordinator
             coordinator.trigger("test start")
+            // Drags work in test runs too, so M2 can be checked with FakeWindows.
+            updateDragTracking(granted: true)
             // `--limit-later 8:12` changes the test limit after 8 seconds (owner's step 9).
             if let later = value(after: "--limit-later")?.split(separator: ":"), later.count == 2,
                let delay = Double(later[0]), let limit = Int(later[1]) {

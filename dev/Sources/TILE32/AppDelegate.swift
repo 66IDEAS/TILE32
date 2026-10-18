@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var spaces: SpaceMonitor?
     var coordinator: TilingCoordinator?
     var dragTracker: MouseDragTracker?
+    let overlay = OverlayController()
     /// The windows behind the last "Windows" submenu, so a choice can raise the right one.
     var listedWindows: [WindowID: WindowSnapshot] = [:]
     var refreshingMenu = false
@@ -74,8 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         updateMenu()
 
+        updateDragTracking(granted: permission.isGranted)
         #if DEBUG
-        updateDragLogging(granted: permission.isGranted)
         // A first Space reading, so the first desktop switch can already report moved windows.
         if permission.isGranted { Task { await logSpaceWindows() } }
         #endif
@@ -95,9 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func permissionChanged(_ granted: Bool) {
         coordinator?.setState(granted ? runStateStore.storedState : .noPermission)
-        #if DEBUG
-        updateDragLogging(granted: granted)
-        #endif
+        updateDragTracking(granted: granted)
         updateMenu()
     }
 
@@ -107,6 +106,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runStateStore.setPaused(!resume)
         showRestoredMessage = false
         coordinator.setState(resume ? .running : .paused)
+    }
+
+    // MARK: Drag-to-split (M2, US-13 to US-18)
+
+    /// The tracker watches title-bar drags while the permission is granted; the overlay shows
+    /// where a release would put the window, and the coordinator applies the drop.
+    func updateDragTracking(granted: Bool) {
+        guard granted else {
+            dragTracker?.stop()
+            overlay.hide()
+            return
+        }
+        if dragTracker == nil {
+            #if DEBUG
+            let tracker = MouseDragTracker(displays: { [weak self] in self?.displayTable ?? DisplayTable(screens: []) },
+                                           describe: { number, pid in await Self.describeWindow(number: number, pid: pid) })
+            #else
+            let tracker = MouseDragTracker(displays: { [weak self] in self?.displayTable ?? DisplayTable(screens: []) })
+            #endif
+            tracker.onDragMove = { [weak self] number, point in self?.dragMoved(number, point) }
+            tracker.onDragEnd = { [weak self] number, point, cancelled in self?.dragEnded(number, point, cancelled) }
+            tracker.onCancel = { [weak self] in self?.overlay.hide() }
+            dragTracker = tracker
+        }
+        dragTracker?.start()
+    }
+
+    private func dragMoved(_ number: CGWindowID, _ point: CGPoint) {
+        guard let coordinator else { return }
+        Task {
+            let table = displayTable
+            if let preview = await coordinator.dragMoved(number, at: point),
+               let display = table.display(id: preview.key.display) {
+                overlay.show(area: preview.area, label: OverlayController.label(for: preview.target), on: display, table: table)
+            } else {
+                overlay.hide()
+            }
+        }
+    }
+
+    private func dragEnded(_ number: CGWindowID, _ point: CGPoint, _ cancelled: Bool) {
+        overlay.hide()
+        guard let coordinator else { return }
+        Task { await coordinator.dragEnded(number, at: point, cancelled: cancelled) }
     }
 
     // MARK: Menu state (UX-2, UX-9)

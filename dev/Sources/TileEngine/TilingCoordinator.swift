@@ -46,6 +46,8 @@ public final class TilingCoordinator {
     private var runAgain = false
     private var lastWrite: ContinuousClock.Instant = .now - .seconds(10)
     private var lastAnimation: ContinuousClock.Instant = .now - .seconds(10)
+    /// The last reading, so a drop can write without reading every window again.
+    private var lastObservation: Observation?
 
     /// `onlyBundleIDs` limits tiling to some apps; used by test runs on FakeWindows.
     public init(engine: LayoutEngine, spaceService: SpaceService, initialState: RunState,
@@ -177,6 +179,7 @@ public final class TilingCoordinator {
         repeat {
             runAgain = false
             let observation = await observe()
+            lastObservation = observation
             let summary = await engine.reconcile(observation, limits: limits())
             if summary.changedAnything { lastWrite = .now }
             if summary.minimised > 0 || summary.restored > 0 || summary.arrived > 0 { lastAnimation = .now }
@@ -203,6 +206,42 @@ public final class TilingCoordinator {
         let all = AppInfo.runningRegularApps()
         guard let onlyBundleIDs else { return all }
         return all.filter { $0.bundleID.map(onlyBundleIDs.contains) ?? false }
+    }
+
+    // MARK: Drag-to-split (M2)
+
+    /// What a release at `point` would do, for the overlay (US-16). Nil while paused.
+    public func dragMoved(_ number: CGWindowID, at point: CGPoint) async -> DropPreview? {
+        guard state == .running else { return nil }
+        let table = displays()
+        return await engine.dropPreview(for: WindowID(UInt64(number)), at: point, displays: table,
+                                        currentSpaces: spaceService.currentSpaces(on: table))
+    }
+
+    /// Applies a drop, or puts the window back after Escape (US-14 to US-19). Runs under the
+    /// same lock as reconcile, so the two never interleave.
+    public func dragEnded(_ number: CGWindowID, at point: CGPoint, cancelled: Bool) async {
+        guard state == .running else { return }
+        while running { try? await Task.sleep(for: .milliseconds(20)) }
+        running = true
+        defer { running = false }
+        let id = WindowID(UInt64(number))
+        var observation = lastObservation
+        if observation?.records.contains(where: { $0.id == id }) != true {
+            observation = await observe()
+            lastObservation = observation
+        }
+        guard let observation else { return }
+        let snapshots = Dictionary(observation.records.map { ($0.id, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let table = displays()
+        let spaces = spaceService.currentSpaces(on: table)
+        if cancelled {
+            await engine.snapBack(id, displays: table, currentSpaces: spaces, snapshots: snapshots)
+        } else {
+            _ = await engine.drop(id, at: point, displays: table, currentSpaces: spaces, snapshots: snapshots)
+        }
+        lastWrite = .now
+        onChange()
     }
 
     /// "Tile now" while running: arranges afresh and keeps tiling (US-4.6).

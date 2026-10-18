@@ -18,7 +18,7 @@ let package = Package(
         .target(name: "TileAX", dependencies: ["TileCore", "TileGeometry", "TileLog"]),
         .target(name: "TileEngine", dependencies: ["TileCore", "TileGeometry", "TileSpaces", "TileAX", "TileLog"]),
         .target(name: "TileInput", dependencies: ["TileCore", "TileGeometry", "TileSpaces", "TileEngine", "TileLog"]),
-        .target(name: "TileUI", dependencies: ["TileCore", "TileEngine", "TileLog"]),
+        .target(name: "TileUI", dependencies: ["TileCore", "TileGeometry", "TileEngine", "TileLog"]),
         .executableTarget(
             name: "TILE32",
             dependencies: ["TileCore", "TileLog", "TileGeometry", "TileSpaces", "TileAX", "TileEngine", "TileInput", "TileUI"]

@@ -16,16 +16,23 @@ public final class MouseDragTracker {
     private var keyMonitor: Any?
     private var spaceObserver: NSObjectProtocol?
     private let displays: @MainActor () -> DisplayTable
-    private let describe: @MainActor (CGWindowID, pid_t) async -> String
+    private let describe: (@MainActor (CGWindowID, pid_t) async -> String)?
+
+    /// A title-bar drag moved: window number and cursor (M2, US-16).
+    public var onDragMove: (@MainActor (CGWindowID, CGPoint) -> Void)?
+    /// The button went up after a title-bar drag; `cancelled` after Escape (US-17).
+    public var onDragEnd: (@MainActor (CGWindowID, CGPoint, Bool) -> Void)?
+    /// A gesture ended without a release to act on (Escape pressed, desktop switch).
+    public var onCancel: (@MainActor () -> Void)?
     private var lastRead = ContinuousClock.now
     private var drags = 0
 
     /// Reads per second while the button is held.
     private static let readInterval: Duration = .milliseconds(33)
 
-    /// `describe` returns how TILE32 would classify the window, for the log only.
+    /// `describe` returns how TILE32 would classify the window, for the debug log only.
     public init(displays: @escaping @MainActor () -> DisplayTable,
-                describe: @escaping @MainActor (CGWindowID, pid_t) async -> String) {
+                describe: (@MainActor (CGWindowID, pid_t) async -> String)? = nil) {
         self.displays = displays
         self.describe = describe
     }
@@ -107,6 +114,9 @@ public final class MouseDragTracker {
             if let window = WindowServerList.window(number: number) {
                 apply(.frameRead(window.bounds, cursor: point))
             }
+            if case .dragging(let press, false) = state {
+                onDragMove?(press.window, point)
+            }
         case .leftMouseUp:
             let point = cursor()
             // One last reading, so a quick drag between two mouse events is not missed.
@@ -124,6 +134,18 @@ public final class MouseDragTracker {
         let (next, outcome) = DragStateMachine.next(state, event)
         state = next
         log(outcome, previous: previous)
+        switch (previous, event, outcome) {
+        case (.dragging(let press, _), _, .droppedDrag(let point)):
+            onDragEnd?(press.window, point, false)
+        case (.dragging(let press, true), .release(let point), _):
+            onDragEnd?(press.window, point, true)
+        case (_, _, .cancelledDrag):
+            onCancel?()
+        case (.dragging, .reset, _):
+            onCancel?()
+        default:
+            break
+        }
     }
 
     private func log(_ outcome: DragStateMachine.Outcome, previous: DragStateMachine.State) {
@@ -144,7 +166,7 @@ public final class MouseDragTracker {
         case .click: text = "click (window did not move)"
         case .movedOtherwise(let reason): text = "window moved, not a drag: \(reason)"
         }
-        let describe = self.describe
+        guard let describe = self.describe else { return }
         Task {
             let info = await describe(press.window, press.pid)
             Log.drag.info("S1 w\(press.window) \(info, privacy: .public): \(text, privacy: .public)")

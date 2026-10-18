@@ -330,30 +330,34 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Errors found:** step 9 (limit 3, then 12): the returning windows became 12 narrow columns instead of 6 x 2. Two causes: (1) arrivals were always appended as columns; fixed by decision D-9 (`appending` fills a second row below 800 points per column, 4 tests); (2) restoring nine windows took 5.7 seconds and 3 of 12 frames failed, because frames were written during the restore animations; fixed by writing the frame while the window is still minimised and restoring afterwards. Re-run with FakeWindows: 12 windows as 6 x 2, all fitting, no failure. Resolved 2026-10-18.
 - **Step 9 re-checked with the owner's real windows** (owner away, with permission to run tests, 2026-10-18 18:43): Resume tiled 11 windows; Dell limit 3 minimised 8 at once; limit 12 brought all 8 back with 9 frames written, all fitting, none failed; the Dell showed 6 columns in 2 rows (the 11th window full height in the last column). Tiling was paused again afterwards, as the owner had left it.
 
-### [ ] T-2.1 Drag tracker connected to the engine
+### [x] T-2.1 Drag tracker connected to the engine
 - **Do:** Turn the logging tracker of T-0.21 into the real one: on `Dragging`, ask the engine for a snapshot of the layout under the cursor, compute `dropTarget`, and on release send `applyDrop`, `moveToEmptyDisplay` or `snapBack`. Add the optional element-at-position refinement on the app's AX queue if S1 showed it is needed.
 - **Traces:** US-13, TA-14, flow 3.4
 - **Done when:** title-bar drags are recognised in all S1 apps, and clicks, content drags and resizes are not.
 - **Depends on:** T-0.22, T-1.5
+- **Result:** the tracker now runs in every build while the permission is granted and reports drag moves and releases to the coordinator; drops run under the same lock as reconcile and use the last reading, so they do not wait for a new one. The element-at-position refinement was not needed (S1). Checked on 2026-10-18 with real mouse events on FakeWindows (owner away, with permission). Done.
 
-### [ ] T-2.2 Drop-zone overlay
+### [~] T-2.2 Drop-zone overlay
 - **Do:** One click-through, non-activating panel per display at `.floating` level, drawing the highlight (accent colour, 18 or 25 percent fill, 3 point border, 10 point radius, 3 point inset) and the label pill (13 point semibold). The six labels, wrapping and hiding rules, Increase Contrast variant, no animation, updates throttled to the display refresh rate.
 - **Traces:** US-16, TA-15, UX-10, UX-11
 - **Done when:** dragging over windows on both displays shows the correct zone and label instantly, the overlay never takes clicks or focus, and it looks right in light and dark mode.
 - **Depends on:** T-2.1
+- **Result:** `OverlayController` with one click-through, non-activating panel per display at `.floating` level, drawing the highlight (accent colour, 18 or 25 percent fill, 3 point border, 10 point radius, 3 point inset) and the label pill (13 point semibold, wraps or hides when narrow, Increase Contrast variant). Screenshot during a held drag on 2026-10-18 showed "Place below" over the bottom half of the target tile. Open: light and dark mode and all zones checked by the owner in the M2 acceptance.
 
-### [~] T-2.3 Apply drops: swap, split, other display, cancel
+### [x] T-2.3 Apply drops: swap, split, other display, cancel
 - **Do:** Implement the engine side of drops: `swapping`, `removing` plus `splitting`, cross-display and empty-display drops, and the snap back for drops without a target. Drops are applied immediately, without the coalescing wait.
 - **Traces:** US-14, US-15, US-17.2, US-17.3, US-18, US-19.1, TA-4, TA-14
 - **Done when:** the US-15.4 scenario works on the real machine, swaps keep the proportions in place (L1), cross-display drops work in both directions, and every cancel restores the exact layout.
 - **Depends on:** T-2.2
 - **Progress:** engine side done (`Drops.swift`): `dropPreview` for the overlay, `drop` for swap, split, drop on an empty display and drops across displays, `snapBack` for drops without a target; frame writing shared with reconcile (`frameBatch`, the dropped window is always written). 9 drop tests with the simulated world, including the US-15.4 scenario. Waiting for the tracker (T-2.1) and the overlay (T-2.2).
+- **Result:** checked with real mouse events on FakeWindows on 2026-10-18: US-15.4 (D onto the bottom edge of A gave A over D in the left column), swap (both windows exchanged tiles), drop on the empty laptop display (filled its usable area, the Dell re-flowed). Done.
 
-### [ ] T-2.4 Escape cancel
+### [x] T-2.4 Escape cancel
 - **Do:** If OQ-1 was answered positively in T-0.22, wire the Escape monitor: mark the drag as cancelled, hide the overlay, and snap back on release. Otherwise remove the monitor and note it in the specification (US-17.1).
 - **Traces:** US-17.1, US-17.4, TA-14, OQ-1
 - **Done when:** Escape cancels a drag, or the decision to drop it is recorded.
 - **Depends on:** T-2.3
+- **Result:** Escape during a real drag cancelled it, hid the overlay and snapped the window back into its tile exactly. Done.
 
 ### [ ] T-2.5 Leave other title-bar behaviour alone
 - **Do:** Make sure the traffic-light buttons, toolbar buttons, double-clicks and floating windows behave as usual. An Option-click zoom and any resize made by an app are put back into the tile once. Paused means no drag handling at all.
