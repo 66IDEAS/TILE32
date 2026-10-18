@@ -334,4 +334,20 @@ struct ReconcileTests {
         let second = await engine.reconcile(world.observe())
         #expect(second.written == 0)
     }
+
+    @Test func changingTheLimitMinimisesOrBringsBackAtOnce() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(3, x: 3000)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe(recency: [1, 2, 3]))
+        var limits = WindowLimits()
+        limits.set(2, for: dell)
+        _ = await engine.reconcile(world.observe(recency: [1, 2, 3]), limits: limits)
+        #expect(world.window(3)!.minimised)
+        #expect(ids(await engine.trees[key2]) == [1, 2])
+        limits.set(3, for: dell)
+        _ = await engine.reconcile(world.observe(recency: [1, 2]), limits: limits)
+        #expect(!world.window(3)!.minimised)
+        #expect(Set(ids(await engine.trees[key2])) == [1, 2, 3])
+    }
 }

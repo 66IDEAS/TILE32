@@ -33,6 +33,13 @@ public enum WindowServerList {
         }
     }
 
+    /// The on-screen normal windows of all apps, frontmost first.
+    public static func onScreenNormalWindows() -> [ServerWindow] {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
+        return list.compactMap(parse).filter { $0.layer == 0 }
+    }
+
     /// Window numbers of the on-screen normal windows, frontmost first. TILE32 uses this as
     /// the starting order of use (TA-27).
     public static func frontToBack() -> [CGWindowID] {

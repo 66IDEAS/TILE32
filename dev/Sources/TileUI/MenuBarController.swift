@@ -83,6 +83,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(windowLimitItem())
         menu.addItem(.separator())
+        let pause = ActionMenuItem(title: state.isRunning ? "Pause tiling" : "Resume tiling") { [actions] in actions.togglePause() }
+        pause.isEnabled = !state.needsPermission
+        menu.addItem(pause)
         let untile = ActionMenuItem(title: "Untile") { [actions] in actions.untile() }
         untile.isEnabled = state.canUntile && !state.needsPermission
         menu.addItem(untile)

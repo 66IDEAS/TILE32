@@ -50,9 +50,11 @@ public struct MenuState: Sendable, Equatable {
     public var windowLimits: [WindowLimitMenuEntry]
     /// "Untile" is available whenever there is something to restore (US-24.6).
     public var canUntile: Bool
+    /// Shows "Pause tiling" while running and "Resume tiling" while paused (UX-3, UX-4).
+    public var isRunning: Bool
 
     public init(icon: IconState, statusLine: String, notFitCount: Int = 0, canTileNow: Bool, needsPermission: Bool = false,
-                windowLimits: [WindowLimitMenuEntry] = [], canUntile: Bool = false) {
+                windowLimits: [WindowLimitMenuEntry] = [], canUntile: Bool = false, isRunning: Bool = false) {
         self.icon = icon
         self.statusLine = statusLine
         self.notFitCount = notFitCount
@@ -60,6 +62,7 @@ public struct MenuState: Sendable, Equatable {
         self.needsPermission = needsPermission
         self.windowLimits = windowLimits
         self.canUntile = canUntile
+        self.isRunning = isRunning
     }
 }
 
@@ -73,6 +76,7 @@ public struct MenuActions {
     /// The user picked a window limit for a display (US-31.2).
     public var setWindowLimit: @MainActor (String, Int) -> Void
     public var untile: @MainActor () -> Void
+    public var togglePause: @MainActor () -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -86,6 +90,7 @@ public struct MenuActions {
         raiseWindow: @escaping @MainActor (WindowID) -> Void = { _ in },
         setWindowLimit: @escaping @MainActor (String, Int) -> Void = { _, _ in },
         untile: @escaping @MainActor () -> Void = {},
+        togglePause: @escaping @MainActor () -> Void = {},
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -98,6 +103,7 @@ public struct MenuActions {
         self.raiseWindow = raiseWindow
         self.setWindowLimit = setWindowLimit
         self.untile = untile
+        self.togglePause = togglePause
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces

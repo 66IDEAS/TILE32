@@ -214,31 +214,35 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 
 Goal: windows arrange themselves, every Space on every display keeps its own arrangement, and the first run starts paused.
 
-### [ ] T-1.1 Engine run states and pause
+### [~] T-1.1 Engine run states and pause
 - **Do:** Add the run states `.running`, `.paused` and `.noPermission`. "Pause tiling" and "Resume tiling" in the menu, with the paused icon (UX-4). The paused flag is stored in `UserDefaults` with default `true`, so a fresh install starts paused and shows "Tiling paused - choose Resume tiling to start". Resume re-applies stored trees and adds or removes windows that changed while paused. US-23 is built here instead of M3, because the first-run pause (US-23.5) is needed as soon as tiling becomes automatic.
 - **Traces:** US-23, TA-17, TA-19, UX-4, UX-9, constitution product rule 5
 - **Done when:** a fresh install moves nothing until "Resume tiling", the paused state survives a restart, and resuming restores the stored layouts.
 - **Depends on:** T-0.24
+- **Result:** run states in `TilingCoordinator`, paused flag and "resumed once" in `UserDefaults` (fresh install starts paused), "Pause tiling" / "Resume tiling" in the menu, status lines and icon per UX-9 and UX-2, "Tile now" grey while paused, Untile pauses. Waiting for the owner check in the M1 acceptance.
 
-### [ ] T-1.2 Observers and event coalescing
+### [x] T-1.2 Observers and event coalescing
 - **Do:** Register the AX observers of TA-9 for every regular app and the workspace notifications for launch, terminate, hide and unhide. Feed every event into the engine's coalescing queue (120 ms quiet time, 400 ms maximum).
 - **Traces:** TA-9, TA-12, TA-13
 - **Done when:** opening, closing, minimising and hiding windows in three apps produces exactly one layout pass per burst in the log.
 - **Depends on:** T-1.1
+- **Result:** `AXEventSource` (one observer per app on the observer thread: created, focus changed, moved, resized, minimised, restored), workspace notifications (launch, quit, hide, unhide, activate, desktop switch), a one-second comparison of the window server's on-screen list (catches closed windows and Mission Control moves), coalescing 120 ms quiet / 400 ms at most, no run while the mouse button is held, TILE32's own move events ignored for 700 ms. Live check on 2026-10-18 with FakeWindows: every step handled within about a second, no extra writes. Done.
 
-### [~] T-1.3 New windows join, closed windows re-flow
+### [x] T-1.3 New windows join, closed windows re-flow
 - **Do:** On a new tiled window, record its original frame, find its display and Space, and call `appending`. On close, call `removing`. Write only the affected layout.
 - **Traces:** US-6, US-7, L3, L4, TA-18 (recording only)
 - **Done when:** opening a fourth window gives four columns with proportional shrinking, closing one restores the proportions of L4, and the last window on a display fills it.
 - **Depends on:** T-1.2
 - **Progress:** engine logic done in the reconcile step (`Reconcile.swift`, 17 tests with a simulated world): arrivals join by L3, departures re-flow by L4, a second identical reading writes nothing. Waiting for the observers (T-1.2) to run it automatically.
+- **Result:** live check on 2026-10-18 with FakeWindows (`--auto-fakewindows`): a 4th window joined, a closed one re-flowed. Done.
 
-### [~] T-1.4 Minimise and hide with return hint
+### [x] T-1.4 Minimise and hide with return hint
 - **Do:** Before removing a minimised window or a hidden app's windows, store the return hint (nearest sibling and side). On return, use `splitting` with the hint if the sibling is still there, otherwise `appending`.
 - **Traces:** US-8, TA-9
 - **Done when:** a window minimised from a column of two comes back into the same column on the same side.
 - **Depends on:** T-1.3
 - **Progress:** `LayoutTree.returnHint` (4 tests) and its use in reconcile: minimised windows and windows of hidden apps come back next to their former neighbour; user-minimised windows are never brought back.
+- **Result:** live check: a minimised window came back next to its old neighbour; a hidden app left and came back. Done.
 
 ### [~] T-1.5 Per-Space layouts
 - **Do:** On `activeSpaceDidChange`, ask `TileSpaces` for the shown Spaces. Leave the trees of hidden Spaces untouched, never write to their windows, reconcile the trees of shown Spaces (windows that left or arrived), and build a `flat` tree for a Space shown for the first time. Write frames only if a tree changed. Support "Displays have separate Spaces" on and off.

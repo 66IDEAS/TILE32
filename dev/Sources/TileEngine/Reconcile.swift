@@ -141,6 +141,14 @@ extension LayoutEngine {
                 summary.arrived += 1
             }
 
+            // A lowered limit minimises the least recently used windows at once (US-31.7).
+            while tree.windowIDs.count > limit,
+                  let victim = tree.windowIDs.max(by: { lastUsed($0) < lastUsed($1) }),
+                  let victimRecord = records[victim] {
+                tree = tree.removing(victim)
+                toMinimise.append((victim, victimRecord.snapshot, key))
+            }
+
             // Freed tiles bring back windows TILE32 minimised, most recent first (US-31.6).
             while tree.windowIDs.count < limit,
                   let back = minimisedOrder.last(where: { minimisedKeys[$0] == key }),

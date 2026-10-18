@@ -11,100 +11,55 @@ import TileUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var menuBar: MenuBarController?
-    private var displays: DisplayMonitor?
-    private var permission: PermissionMonitor?
-    private var spaces: SpaceMonitor?
-    private var dragTracker: MouseDragTracker?
+    var menuBar: MenuBarController?
+    var displays: DisplayMonitor?
+    var permission: PermissionMonitor?
+    var spaces: SpaceMonitor?
+    var coordinator: TilingCoordinator?
+    var dragTracker: MouseDragTracker?
     /// The windows behind the last "Windows" submenu, so a choice can raise the right one.
-    private var listedWindows: [WindowID: WindowSnapshot] = [:]
-    private var refreshingMenu = false
+    var listedWindows: [WindowID: WindowSnapshot] = [:]
+    var refreshingMenu = false
     /// The last Space reading, to log which windows moved to another desktop (session A).
-    private var lastSpaceMap: SpaceDiagnostics.SpaceMap = [:]
-    private let engine = LayoutEngine()
-    private let limitStore = WindowLimitStore()
-    private lazy var limits = limitStore.load()
+    var lastSpaceMap: SpaceDiagnostics.SpaceMap = [:]
+    /// Shown in the status line after "Untile" until the state changes (UX-9).
+    var showRestoredMessage = false
+    let engine = LayoutEngine()
+    let limitStore = WindowLimitStore()
+    lazy var limits = limitStore.load()
+    let runStateStore = RunStateStore()
+
+    var displayTable: DisplayTable { displays?.table ?? DisplayTable(screens: []) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         Log.ui.info("TILE32 \(version, privacy: .public) started")
 
-        displays = DisplayMonitor { _ in }
+        displays = DisplayMonitor { [weak self] _ in self?.coordinator?.trigger("displays changed") }
         #if DEBUG
-        // Debug builds only: `open -n TILE32.app --args --dump-windows` logs every window and
-        // quits, without a menu-bar icon. Lets Claude check readings without opening menus.
-        if CommandLine.arguments.contains("--dump-windows") {
-            startSpaceMonitor()
-            runDumpAndQuit()
-            return
-        }
-        // `--frame-test-fakewindows` runs the S2 tool on FakeWindows windows only, so frame
-        // writing can be checked without moving any of the owner's windows.
-        // `--frame-test-all` (session B): the S2 tool on every tiled window of the shown
-        // desktop. Moves the owner's windows; only with the owner's agreement.
-        if CommandLine.arguments.contains("--frame-test-all") {
-            Task {
-                await frameWriteTest(onlyBundleID: nil)
-                NSApp.terminate(nil)
-            }
-            return
-        }
-        if CommandLine.arguments.contains("--frame-test-fakewindows") {
-            Task {
-                await frameWriteTest(onlyBundleID: "com.66ideas.tile32.FakeWindows")
-                NSApp.terminate(nil)
-            }
-            return
-        }
-        // `--tile-now-fakewindows` runs "Tile now" on FakeWindows windows only (task T-0.24),
-        // so the engine can be checked on the real screen without moving the owner's windows.
-        if CommandLine.arguments.contains("--tile-now-fakewindows") {
-            Task {
-                await tileNow(onlyBundleID: "com.66ideas.tile32.FakeWindows")
-                NSApp.terminate(nil)
-            }
-            return
-        }
-        // `--hidden-space-write-test` (session A, S3): remembers a FakeWindows window, waits until
-        // the owner has moved it to another desktop, then tries to move it while it is hidden.
-        if CommandLine.arguments.contains("--hidden-space-write-test") {
-            Task {
-                await hiddenSpaceWriteTest()
-                NSApp.terminate(nil)
-            }
-            return
-        }
-        // `--tile-then-untile-fakewindows`: Tile now on FakeWindows only, wait 3 seconds, Untile.
-        if CommandLine.arguments.contains("--tile-then-untile-fakewindows") {
-            Task {
-                await tileNow(onlyBundleID: "com.66ideas.tile32.FakeWindows")
-                try? await Task.sleep(for: .seconds(3))
-                _ = await engine.untile(displays: displays?.table ?? DisplayTable(screens: []))
-                NSApp.terminate(nil)
-            }
-            return
-        }
-        if CommandLine.arguments.contains("--dump-spaces") {
-            Task {
-                logSpaceDiagnostics(windows: false)
-                await logSpaceWindows()
-                NSApp.terminate(nil)
-            }
-            return
-        }
+        if runDebugModeIfRequested() { return }
         #endif
         startSpaceMonitor()
         let permission = PermissionMonitor { [weak self] granted in self?.permissionChanged(granted) }
         self.permission = permission
 
+        coordinator = TilingCoordinator(
+            engine: engine, spaceService: SkyLightSpaceService.shared,
+            initialState: permission.isGranted ? runStateStore.storedState : .noPermission,
+            displays: { [weak self] in self?.displayTable ?? DisplayTable(screens: []) },
+            limits: { [weak self] in self?.limits ?? WindowLimits() },
+            onChange: { [weak self] in self?.updateMenu() }
+        )
+
         menuBar = MenuBarController(
-            state: menuState(permissionGranted: permission.isGranted),
+            state: baseMenuState(),
             actions: MenuActions(
                 tileNow: { [weak self] in self?.tileNowFromMenu() },
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
                 raiseWindow: { [weak self] id in self?.raise(id) },
                 setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
                 untile: { [weak self] in self?.untileFromMenu() },
+                togglePause: { [weak self] in self?.togglePause() },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -117,9 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 diagnostics: { [weak self] in self?.diagnostics() ?? "" }
             )
         )
+        updateMenu()
 
-        updateDragLogging(granted: permission.isGranted)
         #if DEBUG
+        updateDragLogging(granted: permission.isGranted)
         // A first Space reading, so the first desktop switch can already report moved windows.
         if permission.isGranted { Task { await logSpaceWindows() } }
         #endif
@@ -135,277 +91,145 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Logs which undocumented Space functions were found, then the Space of each display (S6).
-    private func startSpaceMonitor() {
-        let service = SkyLightSpaceService.shared
-        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
-        Log.spaces.info("macOS \(osVersion, privacy: .public); Space functions available: \(service.isAvailable)")
-        for key in ["MainConnectionID", "CopyManagedDisplaySpaces", "CopySpacesForWindows", "AXUIElementGetWindow"] {
-            Log.spaces.info("  \(key, privacy: .public): \(service.resolvedFunctions[key] ?? "missing", privacy: .public)")
-        }
-        let monitor = SpaceMonitor(service: service, displays: { [weak self] in
-            self?.displays?.table ?? DisplayTable(screens: [])
-        }, onChange: { [weak self] in
-            #if DEBUG
-            // Spike S6 and S3: record everything on every Space switch.
-            self?.logSpaceDiagnostics(windows: true)
-            #endif
-        })
-        monitor.logCurrentSpaces()
-        spaces = monitor
+    // MARK: Run state (US-23, US-27)
+
+    private func permissionChanged(_ granted: Bool) {
+        coordinator?.setState(granted ? runStateStore.storedState : .noPermission)
+        #if DEBUG
+        updateDragLogging(granted: granted)
+        #endif
+        updateMenu()
     }
 
-    /// Until the engine exists (T-0.24) there are no trees; this lists every window with its
-    /// number, display and Space (T-0.14).
-    private func dumpWindows() {
-        guard AccessibilityPermission.isGranted else {
-            Log.layout.info("Dump skipped: Accessibility permission missing")
-            return
+    private func togglePause() {
+        guard let coordinator else { return }
+        let resume = coordinator.state == .paused
+        runStateStore.setPaused(!resume)
+        showRestoredMessage = false
+        coordinator.setState(resume ? .running : .paused)
+    }
+
+    // MARK: Menu state (UX-2, UX-9)
+
+    private func baseMenuState() -> MenuState {
+        let entries = displayTable.displays.map { display in
+            WindowLimitMenuEntry(displayUUID: display.id.uuid, displayName: display.name, limit: limits.limit(for: display))
         }
-        let apps = AppInfo.runningRegularApps()
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        let state = coordinator?.state ?? .noPermission
+        switch state {
+        case .noPermission:
+            return MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
+                             canTileNow: false, needsPermission: true, windowLimits: entries)
+        case .paused:
+            let line = showRestoredMessage ? "Windows restored - tiling paused"
+                : runStateStore.hasResumedOnce ? "Tiling paused" : "Tiling paused - choose Resume tiling to start"
+            return MenuState(icon: .paused, statusLine: line, canTileNow: false, windowLimits: entries)
+        case .running:
+            return MenuState(icon: .active, statusLine: "No windows to arrange", canTileNow: true,
+                             windowLimits: entries, isRunning: true)
+        }
+    }
+
+    func updateMenu() {
         Task {
-            let result = await WindowScan.run(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
-            WindowScan.log(result, displays: displays)
+            var state = baseMenuState()
+            state.canUntile = await engine.canUntile
+            if coordinator?.state == .running, let counts = await coordinator?.counts() {
+                state.statusLine = Self.statusLine(counts)
+                state.notFitCount = counts.doesNotFit
+            }
+            menuBar?.update(state)
         }
     }
 
-    #if DEBUG
-    private func runDumpAndQuit() {
-        let apps = AppInfo.runningRegularApps()
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        Log.layout.info("Dump mode: permission \(AccessibilityPermission.isGranted ? "granted" : "missing", privacy: .public)")
+    /// "Tiling 18 windows on 2 displays - 15 minimised to make room - 1 does not fit" (UX-9).
+    static func statusLine(_ counts: TilingCoordinator.Counts) -> String {
+        guard counts.tiled > 0 else { return "No windows to arrange" }
+        var line = "Tiling \(counts.tiled) \(counts.tiled == 1 ? "window" : "windows") on \(counts.displays) "
+            + (counts.displays == 1 ? "display" : "displays")
+        if counts.minimised > 0 { line += " - \(counts.minimised) minimised to make room" }
+        if counts.doesNotFit > 0 { line += " - \(counts.doesNotFit) \(counts.doesNotFit == 1 ? "does" : "do") not fit" }
+        return line
+    }
+
+    // MARK: Commands
+
+    /// "Tile now" (US-4.6): arranges the shown desktops afresh; tiling keeps running.
+    private func tileNowFromMenu() {
+        guard let coordinator, coordinator.state == .running else { return }
+        Task { _ = await coordinator.tileNow() }
+    }
+
+    /// "Untile" (US-24): restores every window, then pauses (US-24.4).
+    private func untileFromMenu() {
         Task {
-            let result = await WindowScan.run(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
-            WindowScan.log(result, displays: displays)
-            NSApp.terminate(nil)
+            coordinator?.setState(.paused)
+            runStateStore.setPaused(true)
+            _ = await engine.untile(displays: displayTable)
+            showRestoredMessage = true
+            updateMenu()
         }
     }
-    #endif
 
-    /// Spike tools for S6 and S3 (T-0.17).
-    private func logSpaceDiagnostics(windows: Bool) {
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        SpaceDiagnostics.logSpaces(service: SkyLightSpaceService.shared, displays: displays)
-        guard windows else { return }
-        Task { await logSpaceWindows() }
-    }
-
-    private func logSpaceWindows() async {
-        guard AccessibilityPermission.isGranted else { return }
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        let map = await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
-        SpaceDiagnostics.logMoves(from: lastSpaceMap, to: map)
-        lastSpaceMap = map
-    }
-
-    /// "Tile now" (US-4). For the owner's windows it stays switched off until the owner agrees
-    /// and open question Q-3 is decided (task T-0.24).
-    private func tileNow(onlyBundleID: String?) async {
-        guard AccessibilityPermission.isGranted else { return }
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        let apps = AppInfo.runningRegularApps().filter { onlyBundleID == nil || $0.bundleID == onlyBundleID }
-        let service = SkyLightSpaceService.shared
-        let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: service)
-        var limits = self.limits
-        // Test runs may override the limit for every display: `--window-limit 4`.
-        if let index = CommandLine.arguments.firstIndex(of: "--window-limit"), index + 1 < CommandLine.arguments.count,
-           let value = Int(CommandLine.arguments[index + 1]) {
-            for display in displays.displays { limits.set(value, for: display.id) }
-        }
-        let recency = WindowServerList.frontToBack().map { WindowID(UInt64($0)) }
-        _ = await engine.tileNow(records: Array(scan.registry.records.values), displays: displays,
-                                 currentSpaces: service.currentSpaces(on: displays), limits: limits, recency: recency)
-    }
-
-    private func runFrameWriteTest(onlyBundleID: String?) {
-        Task { await frameWriteTest(onlyBundleID: onlyBundleID) }
-    }
-
-    private func frameWriteTest(onlyBundleID: String?) async {
-        guard AccessibilityPermission.isGranted else { return }
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        await FrameWriteTest.run(apps: AppInfo.runningRegularApps(), displays: displays,
-                                 spaceService: SkyLightSpaceService.shared, onlyBundleID: onlyBundleID)
+    /// US-31.2 and US-31.7: remembered per display and applied at once.
+    private func setWindowLimit(_ uuid: String, _ value: Int) {
+        limits.set(value, for: DisplayID(uuid: uuid))
+        limitStore.save(limits)
+        Log.layout.info("Window limit for \(uuid, privacy: .public) set to \(value)")
+        coordinator?.trigger("window limit changed")
+        updateMenu()
     }
 
     /// Reads the windows again whenever the menu opens; the submenu updates while open (US-3.3).
-    private func refreshWindowMenu() {
+    func refreshWindowMenu() {
         guard AccessibilityPermission.isGranted, !refreshingMenu else { return }
         refreshingMenu = true
         let apps = AppInfo.runningRegularApps()
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        let table = displayTable
         Task {
             let minimised = await engine.minimisedByEngine
-            let result = await WindowMenuLoader.load(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared,
+            let result = await WindowMenuLoader.load(apps: apps, displays: table, spaceService: SkyLightSpaceService.shared,
                                                      minimisedToMakeRoom: minimised)
             listedWindows = result.windows
             menuBar?.setWindowContent(result.content)
             refreshingMenu = false
         }
+        updateMenu()
     }
 
-    /// Brings the chosen window to the front (US-3.4).
+    /// Brings the chosen window to the front (US-3.4). A window minimised to make room comes
+    /// back and swaps in through the next reconcile (US-31.4).
     private func raise(_ id: WindowID) {
         guard let snapshot = listedWindows[id] else { return }
         let pid = snapshot.app.pid
         Task {
+            if snapshot.isMinimized {
+                _ = await AXWorker.shared.run(for: pid) { WindowActions.setMinimised(snapshot.element, false) }
+            }
             let error = await AXWorker.shared.run(for: pid) { WindowActions.raise(snapshot.element) }
             if error != .success {
                 Log.ax.info("Raising \(id.description, privacy: .public) failed: AXError \(error.rawValue)")
             }
             NSRunningApplication(processIdentifier: pid)?.activate()
+            coordinator?.trigger("window raised from the menu")
         }
     }
+}
 
-    private func permissionChanged(_ granted: Bool) {
-        menuBar?.update(menuState(permissionGranted: granted))
-        updateDragLogging(granted: granted)
+/// The paused flag and whether the user ever resumed (US-23.3, US-23.5, TA-19).
+struct RunStateStore {
+    private static let pausedKey = "tilingPaused"
+    private static let resumedKey = "hasResumedOnce"
+
+    /// A fresh install starts paused (US-23.5).
+    var storedState: TilingCoordinator.RunState {
+        (UserDefaults.standard.object(forKey: Self.pausedKey) as? Bool ?? true) ? .paused : .running
     }
 
-    /// Spike S1 (T-0.21): in debug builds, every press, drag and resize is logged while the
-    /// permission is granted. Nothing is changed.
-    private func updateDragLogging(granted: Bool) {
-        #if DEBUG
-        if granted {
-            if dragTracker == nil {
-                dragTracker = MouseDragTracker(
-                    displays: { [weak self] in self?.displays?.table ?? DisplayTable(screens: []) },
-                    describe: { number, pid in await Self.describeWindow(number: number, pid: pid) }
-                )
-            }
-            dragTracker?.start()
-        } else {
-            dragTracker?.stop()
-        }
-        #endif
-    }
+    var hasResumedOnce: Bool { UserDefaults.standard.bool(forKey: Self.resumedKey) }
 
-    /// App name and TILE32's classification of one window, for the S1 log.
-    private static func describeWindow(number: CGWindowID, pid: pid_t) async -> String {
-        guard let running = NSRunningApplication(processIdentifier: pid) else { return "pid \(pid)" }
-        let app = AppInfo(pid: pid, bundleID: running.bundleIdentifier, name: running.localizedName ?? "?")
-        guard running.activationPolicy == .regular else { return "\(app.name) [not a regular app]" }
-        let results = await WindowReader.readAll([app]) { SkyLightSpaceService.shared.windowNumber(of: $0) }
-        guard let snapshot = results.first?.windows.first(where: { $0.windowNumber == number }) else {
-            return "\(app.name) [not listed]"
-        }
-        let classification: String = switch WindowClassifier.classify(snapshot) {
-        case .tiled: "tiled"
-        case .minimised: "minimised"
-        case .floating(let reason): "floating: \(reason.rawValue)"
-        }
-        return "\(app.name) [\(classification)]"
-    }
-
-    /// Until the engine exists (T-0.24) nothing is tiled, so a granted permission shows the
-    /// paused state and "Tile now" stays grey. Texts follow UX-9.
-    private func menuState(permissionGranted: Bool) -> MenuState {
-        let entries = (displays?.table.displays ?? []).map { display in
-            WindowLimitMenuEntry(displayUUID: display.id.uuid, displayName: display.name, limit: limits.limit(for: display))
-        }
-        return permissionGranted
-            ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: true, windowLimits: entries)
-            : MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
-                        canTileNow: false, needsPermission: true, windowLimits: entries)
-    }
-
-    private func hiddenSpaceWriteTest() async {
-        let service = SkyLightSpaceService.shared
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        let apps = AppInfo.runningRegularApps().filter { $0.bundleID == "com.66ideas.tile32.FakeWindows" }
-        let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: service)
-        guard let record = scan.registry.records.values.first(where: { WindowClassifier.classify($0.snapshot) == .tiled }),
-              let number = record.snapshot.windowNumber, let original = record.snapshot.frame else {
-            Log.spaces.error("S3 hidden write: no FakeWindows window found")
-            return
-        }
-        Log.spaces.info("S3 hidden write: watching w\(number); waiting up to 90 s for it to be moved to another desktop")
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < .seconds(90) {
-            let shown = Set(service.currentSpaces(on: displays).values.map(\.id))
-            if let spaces = service.spaces(of: [number])[number], !spaces.isEmpty, shown.isDisjoint(with: spaces) {
-                try? await Task.sleep(for: .seconds(1))
-                let target = original.offsetBy(dx: 200, dy: 100)
-                let result = await AXWorker.shared.run(for: record.snapshot.app.pid) {
-                    FrameWriter.write(target, to: record.snapshot.element, pid: record.snapshot.app.pid)
-                }
-                try? await Task.sleep(for: .milliseconds(500))
-                let server = WindowServerList.window(number: number)?.bounds
-                Log.spaces.info("""
-                    S3 hidden write: w\(number) on \(spaces.map(\.description).joined(separator: ","), privacy: .public): \
-                    errors \(result.sizeError.rawValue)/\(result.positionError.rawValue), \
-                    requested \(String(describing: target), privacy: .public), \
-                    Accessibility reads \(result.actual.map { String(describing: $0) } ?? "nothing", privacy: .public), \
-                    window server reports \(server.map { String(describing: $0) } ?? "nothing", privacy: .public)
-                    """)
-                return
-            }
-            try? await Task.sleep(for: .milliseconds(500))
-        }
-        Log.spaces.info("S3 hidden write: the window was not moved within 90 s")
-    }
-
-    /// "Tile now" from the menu (US-4, US-31): one arrangement of the shown desktops. Automatic
-    /// tiling follows in M1, so the icon stays in the paused state afterwards.
-    private func tileNowFromMenu() {
-        Task {
-            await tileNow(onlyBundleID: nil)
-            await refreshStatusAfterTiling()
-        }
-    }
-
-    private func refreshStatusAfterTiling() async {
-        var state = menuState(permissionGranted: permission?.isGranted ?? false)
-        let trees = await engine.trees
-        let tiled = trees.values.reduce(0) { $0 + $1.windowIDs.count }
-        let displaysUsed = Set(trees.compactMap { $0.value.isEmpty ? nil : $0.key.display }).count
-        let minimised = await engine.minimisedByEngine.count
-        let notFitting = await engine.doesNotFit.count
-        var line = "Tiling \(tiled) \(tiled == 1 ? "window" : "windows") on \(displaysUsed) \(displaysUsed == 1 ? "display" : "displays")"
-        if minimised > 0 { line += " - \(minimised) minimised to make room" }
-        if notFitting > 0 { line += " - \(notFitting) \(notFitting == 1 ? "does" : "do") not fit" }
-        state.statusLine = line
-        state.notFitCount = notFitting
-        state.canUntile = await engine.canUntile
-        menuBar?.update(state)
-    }
-
-    /// "Untile" (US-24): restores every window and shows it in the status line.
-    private func untileFromMenu() {
-        let displays = self.displays?.table ?? DisplayTable(screens: [])
-        Task {
-            _ = await engine.untile(displays: displays)
-            var state = menuState(permissionGranted: permission?.isGranted ?? false)
-            state.statusLine = "Windows restored - tiling paused"
-            menuBar?.update(state)
-        }
-    }
-
-    /// US-31.2: remembered per display. Applying a new limit to tiled layouts at once is T-1.14.
-    private func setWindowLimit(_ uuid: String, _ value: Int) {
-        limits.set(value, for: DisplayID(uuid: uuid))
-        limitStore.save(limits)
-        Log.layout.info("Window limit for \(uuid, privacy: .public) set to \(value)")
-        menuBar?.update(menuState(permissionGranted: permission?.isGranted ?? false))
-    }
-
-    private func diagnostics() -> String {
-        let info = ProcessInfo.processInfo
-        var lines = [
-            "TILE32 diagnostics",
-            "Version: \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")",
-            "macOS: \(info.operatingSystemVersionString)",
-            "Accessibility permission: \(AccessibilityPermission.isGranted ? "granted" : "missing")",
-            "Displays:",
-        ]
-        for display in displays?.table.displays ?? [] {
-            lines.append("  \(display.name) [\(display.id)] frame \(display.frame) usable \(display.usableArea)\(display.isPrimary ? " primary" : "")")
-        }
-        let service = SkyLightSpaceService.shared
-        lines.append("Space functions: " + ["MainConnectionID", "CopyManagedDisplaySpaces", "CopySpacesForWindows", "AXUIElementGetWindow"]
-            .map { "\($0)=\(service.resolvedFunctions[$0] ?? "missing")" }.joined(separator: ", "))
-        lines += spaces?.describe() ?? []
-        return lines.joined(separator: "\n")
+    func setPaused(_ paused: Bool) {
+        UserDefaults.standard.set(paused, forKey: Self.pausedKey)
+        if !paused { UserDefaults.standard.set(true, forKey: Self.resumedKey) }
     }
 }

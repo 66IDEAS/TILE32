@@ -143,6 +143,24 @@ final class FakeWindowsApp: NSObject, NSApplicationDelegate {
         windows.append(panel)
     }
 
+    private func window(number: Int) -> NSWindow? {
+        windows.first { $0.title.hasPrefix("FakeWindows \(number):") }
+    }
+
+    private func perform(_ words: [String]) {
+        guard let verb = words.first else { return }
+        let number = words.count > 1 ? Int(words[1]) : nil
+        switch verb {
+        case "open": if words.count > 1 { cases.first { $0.key == words[1] }?.action(self) }
+        case "close": number.flatMap(window(number:))?.close()
+        case "minimise": number.flatMap(window(number:))?.miniaturize(nil)
+        case "restore": number.flatMap(window(number:))?.deminiaturize(nil)
+        case "hide": NSApp.hide(nil)
+        case "unhide": NSApp.unhideWithoutActivation()
+        default: break
+        }
+    }
+
     @objc private func runCase(_ sender: NSButton) {
         guard let key = sender.identifier?.rawValue, let testCase = cases.first(where: { $0.key == key }) else { return }
         testCase.action(self)
@@ -162,6 +180,15 @@ final class FakeWindowsApp: NSObject, NSApplicationDelegate {
         if let delay = value("--hang-after").flatMap(Double.init) {
             let seconds = value("--hang-seconds").flatMap(Double.init) ?? 10
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Thread.sleep(forTimeInterval: seconds) }
+        }
+        // `--script "2:open normal;4:close 1;6:minimise 2;8:restore 2;10:hide;12:unhide"`:
+        // timed actions for checks of automatic tiling (M1). Numbers are the window numbers
+        // shown in the titles ("FakeWindows 3: ...").
+        for step in value("--script")?.split(separator: ";") ?? [] {
+            let parts = step.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2, let delay = Double(parts[0]) else { continue }
+            let words = parts[1].split(separator: " ").map(String.init)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.perform(words) }
         }
         if let quit = value("--quit-after").flatMap(Double.init) {
             DispatchQueue.main.asyncAfter(deadline: .now() + quit) { NSApp.terminate(nil) }
