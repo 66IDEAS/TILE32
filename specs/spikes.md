@@ -63,3 +63,19 @@ First run of "Log Spaces" and "Log windows" (task T-0.17), on the current deskto
 - One app did not answer within the timeout.
 
 **Consequence for the design (to confirm in session A, then update TA-16 and TA-20):** TILE32 learns about windows on hidden Spaces only through the window server list (number, owner, Space) and reads their Accessibility element when their Space is shown. Dormant trees therefore hold window numbers, which are stable while a window lives, and get matched to Accessibility elements on return. This fits the existing rule that TILE32 never writes to hidden Spaces.
+
+## S2 Frame writing - FakeWindows only (2026-10-18, before session B)
+
+The frame write tool (task T-0.19) was run on two FakeWindows windows only, so none of the owner's windows moved. The run with real apps is session B (T-0.20).
+
+| Case | Normal window | Window with minimum size 1800 x 1000 |
+|---|---|---|
+| Smaller frame on the same display | matches, 5 ms | does not fit: stays 1800 x 1032 (content minimum plus 32 point title bar) |
+| Left half of the ultrawide (2551 x 1341) | matches, 1 to 3 ms | matches, 4 to 13 ms |
+| Moved to the laptop display (1000 x 700) | matches, 1 to 2 ms | does not fit, 1 to 30 ms |
+| With the enhanced-UI workaround | same results | same results |
+
+- **The write sequence size, position, size works**, also across displays with different scales (1x ultrawide, 2x laptop), and the read-back detects minimum sizes reliably (US-10, TA-11).
+- **No errors** from any write (`AXError` 0 for size and position).
+- The minimum-size window could not be put back to its original frame, because its minimum was set after it opened, so its original frame was below its own minimum. A real app cannot be in that state. Untile (T-3.3) must still expect it and keep such a window at its minimum.
+- The workaround made no difference for FakeWindows, as expected for a simple AppKit app. Session B checks real apps.

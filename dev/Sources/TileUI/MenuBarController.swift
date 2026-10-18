@@ -93,6 +93,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         submenu.addItem(ActionMenuItem(title: "Dump layout trees") { [actions] in actions.dumpLayoutTrees() })
         submenu.addItem(ActionMenuItem(title: "Log Spaces") { [actions] in actions.logSpaces() })
         submenu.addItem(ActionMenuItem(title: "Log windows") { [actions] in actions.logWindows() })
+        submenu.addItem(.separator())
+        // Moves windows: only when the owner agrees (working agreement 1).
+        submenu.addItem(ActionMenuItem(title: "Frame write test (moves windows)") { [actions] in actions.frameWriteTest() })
         submenu.addItem(ActionMenuItem(title: "Copy diagnostics") { [actions] in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(actions.diagnostics(), forType: .string)

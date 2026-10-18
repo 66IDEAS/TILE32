@@ -27,6 +27,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             runDumpAndQuit()
             return
         }
+        // `--frame-test-fakewindows` runs the S2 tool on FakeWindows windows only, so frame
+        // writing can be checked without moving any of the owner's windows.
+        if CommandLine.arguments.contains("--frame-test-fakewindows") {
+            Task {
+                await frameWriteTest(onlyBundleID: "com.66ideas.tile32.FakeWindows")
+                NSApp.terminate(nil)
+            }
+            return
+        }
         if CommandLine.arguments.contains("--dump-spaces") {
             Task {
                 logSpaceDiagnostics(windows: false)
@@ -52,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 dumpLayoutTrees: { [weak self] in self?.dumpWindows() },
                 logSpaces: { [weak self] in self?.logSpaceDiagnostics(windows: false) },
                 logWindows: { [weak self] in self?.logSpaceDiagnostics(windows: true) },
+                frameWriteTest: { [weak self] in self?.runFrameWriteTest(onlyBundleID: nil) },
                 diagnostics: { [weak self] in self?.diagnostics() ?? "" }
             )
         )
@@ -126,6 +136,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard AccessibilityPermission.isGranted else { return }
         let displays = self.displays?.table ?? DisplayTable(screens: [])
         await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
+    }
+
+    private func runFrameWriteTest(onlyBundleID: String?) {
+        Task { await frameWriteTest(onlyBundleID: onlyBundleID) }
+    }
+
+    private func frameWriteTest(onlyBundleID: String?) async {
+        guard AccessibilityPermission.isGranted else { return }
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        await FrameWriteTest.run(apps: AppInfo.runningRegularApps(), displays: displays,
+                                 spaceService: SkyLightSpaceService.shared, onlyBundleID: onlyBundleID)
     }
 
     private func permissionChanged(_ granted: Bool) {

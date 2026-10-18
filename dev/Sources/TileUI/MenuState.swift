@@ -50,6 +50,7 @@ public struct MenuActions {
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
     public var logWindows: @MainActor () -> Void
+    public var frameWriteTest: @MainActor () -> Void
     public var diagnostics: @MainActor () -> String
 
     public init(
@@ -58,6 +59,7 @@ public struct MenuActions {
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
         logWindows: @escaping @MainActor () -> Void = {},
+        frameWriteTest: @escaping @MainActor () -> Void = {},
         diagnostics: @escaping @MainActor () -> String
     ) {
         self.tileNow = tileNow
@@ -65,6 +67,7 @@ public struct MenuActions {
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces
         self.logWindows = logWindows
+        self.frameWriteTest = frameWriteTest
         self.diagnostics = diagnostics
     }
 }

@@ -147,10 +147,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Done when:** every question of S6 and S3 has an answer in `specs/spikes.md`, and TA-16 and TA-26 are confirmed or a revision is proposed to the owner. The question about a notarized build is carried over to T-3.8.
 - **Depends on:** T-0.17
 
-### [ ] T-0.19 Spike tool for frame writing (S2)
+### [x] T-0.19 Spike tool for frame writing (S2)
 - **Do:** Add the debug item "Frame write test": for each tiled window, write size, position, size to a test frame, read it back, and log differences and timings. Include a move from the ultrawide to the laptop display, and try the `AXEnhancedUserInterface` workaround for apps that respond slowly.
 - **Traces:** S2, TA-11
 - **Done when:** the tool runs on demand and restores each window to its previous frame afterwards.
+- **Result:** `FrameWriter` in `TileAX` (size, position, size, read back, optional enhanced-UI workaround) and `FrameWriteTest` in `TileEngine`. Debug menu item "Frame write test (moves windows)", and `--frame-test-fakewindows`, which limits the test to FakeWindows windows. Run on FakeWindows on 2026-10-18 (`specs/spikes.md`, S2). Restoring works except for a window whose original frame is below its own minimum size. Done 2026-10-18.
 - **Depends on:** T-0.14
 
 ### [ ] T-0.20 [owner] Spike session B: frame writing (S2)
