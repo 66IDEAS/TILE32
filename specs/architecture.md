@@ -247,7 +247,9 @@ A resize made by the user with the mouse is handled by TA-25 and changes proport
                                                                             +--
    Pressed --Resized notification--> Resizing --leftMouseDragged--> engine.resizeLive (TA-25)
                                      Resizing --leftMouseUp-------> engine.resizeEnd, then Idle
-   Also: Dragging/Pressed/Resizing -> Idle when TILE32 is paused or loses permission.
+   Also: Dragging/Pressed/Resizing -> Idle when TILE32 is paused or loses permission,
+         or when the shown Space changes while the button is down (session A: the user
+         carries the window to another desktop; US-29 handles the move, there is no drop).
 ```
 
 During `Dragging`, the tracker finds the display under the cursor, asks the engine for that display's tree snapshot, calls `dropTarget` (TA-6), and tells the overlay (TA-15) what to draw. On `leftMouseUp` the tracker sends the engine one of `applyDrop(dragged, targetWindow, zone, targetDisplay)`, `moveToEmptyDisplay(dragged, targetDisplay)` or `snapBack(dragged)`. For a drop onto another display the engine removes the window from the source tree and inserts it into the target tree with `splitting` (or as the root for an empty display), or swaps the two windows between trees.

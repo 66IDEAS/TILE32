@@ -36,7 +36,23 @@ public enum SpaceDiagnostics {
 
     /// "Log windows": windows per Space from the window server, compared with what the
     /// Accessibility API lists for the regular apps.
-    public static func logWindows(apps: [AppInfo], service: SpaceService, displays: DisplayTable) async {
+    /// Where each window of a regular app is, by window number: owner name and Spaces.
+    public typealias SpaceMap = [CGWindowID: (owner: String, spaces: [SpaceID])]
+
+    /// Logs every window whose Spaces differ between two readings, so a window moved to
+    /// another desktop shows up by name (session A, US-29).
+    public static func logMoves(from old: SpaceMap, to new: SpaceMap) {
+        for (number, now) in new.sorted(by: { $0.key < $1.key }) {
+            guard let before = old[number], Set(before.spaces) != Set(now.spaces),
+                  !now.spaces.isEmpty, !before.spaces.isEmpty else { continue }
+            let from = before.spaces.map(\.description).joined(separator: "+")
+            let to = now.spaces.map(\.description).joined(separator: "+")
+            Log.spaces.info("S3 moved: w\(number) \(now.owner, privacy: .public) from \(from, privacy: .public) to \(to, privacy: .public)")
+        }
+    }
+
+    @discardableResult
+    public static func logWindows(apps: [AppInfo], service: SpaceService, displays: DisplayTable) async -> SpaceMap {
         let regularPIDs = Set(apps.map(\.pid))
         let server = WindowServerList.normalWindows().filter { regularPIDs.contains($0.ownerPID) }
         let serverSpaces = service.spaces(of: server.map(\.number))
@@ -83,5 +99,10 @@ public enum SpaceDiagnostics {
         if !unanswered.isEmpty {
             Log.spaces.info("S3 apps that did not answer: \(unanswered.map(\.app.name).joined(separator: ", "), privacy: .public)")
         }
+        var map: SpaceMap = [:]
+        for window in server {
+            if let spaces = serverSpaces[window.number] { map[window.number] = (window.ownerName, spaces) }
+        }
+        return map
     }
 }

@@ -79,3 +79,13 @@ The frame write tool (task T-0.19) was run on two FakeWindows windows only, so n
 - **No errors** from any write (`AXError` 0 for size and position).
 - The minimum-size window could not be put back to its original frame, because its minimum was set after it opened, so its original frame was below its own minimum. A real app cannot be in that state. Untile (T-3.3) must still expect it and keep such a window at its minimum.
 - The workaround made no difference for FakeWindows, as expected for a simple AppKit app. Session B checks real apps.
+
+## Session A, part 1: desktop switches and moves (2026-10-18, owner session)
+
+Run with the debug build logging every Space switch. Window titles are not recorded.
+
+- **Desktop switches:** every switch was reported at once (`activeSpaceDidChangeNotification`), and the Space table always named the right Space and desktop number. When the owner swiped quickly across several desktops, the desktops passed over were not reported as shown, which is fine: TILE32 only acts on the desktop where the user stops.
+- **Window moved with Mission Control (MD22, desktop 2 to 3):** the window server reported the new Space correctly. TILE32's diagnostics only read on Space switches, so the move was seen when the owner switched to desktop 3. **Open for M1 (T-1.6, S4):** find out which notification, if any, tells TILE32 that a window left the shown desktop while the user stays there (candidates: `kAXUIElementDestroyed`, `kAXWindowMoved`, the window dropping out of the on-screen list). If there is none, check the shown desktop's windows when Mission Control closes.
+- **Window carried while switching (Finder, title bar held, Ctrl + right arrow):** the Space switch came 1 second after the press, and the move was reported immediately. The drag tracker classified the gesture as a click, because the window did not move relative to the cursor. **Rule for TA-14:** a Space switch while the button is down ends the gesture without a drop; the move itself is handled by US-29.
+- **Windows on all desktops:** an Xcode window that is on every Space was reported as "moved" on every switch, because the list of Spaces came back in a different order. Fixed: Spaces are compared as sets.
+- **Apps that did not answer** in time varied from switch to switch (WhatsApp, ChatGPT, Outlook, WhichSpace); none blocked a reading.

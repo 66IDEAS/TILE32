@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The windows behind the last "Windows" submenu, so a choice can raise the right one.
     private var listedWindows: [WindowID: WindowSnapshot] = [:]
     private var refreshingMenu = false
+    /// The last Space reading, to log which windows moved to another desktop (session A).
+    private var lastSpaceMap: SpaceDiagnostics.SpaceMap = [:]
     private let engine = LayoutEngine()
     private let limitStore = WindowLimitStore()
     private lazy var limits = limitStore.load()
@@ -50,6 +52,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--tile-now-fakewindows") {
             Task {
                 await tileNow(onlyBundleID: "com.66ideas.tile32.FakeWindows")
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        // `--hidden-space-write-test` (session A, S3): remembers a FakeWindows window, waits until
+        // the owner has moved it to another desktop, then tries to move it while it is hidden.
+        if CommandLine.arguments.contains("--hidden-space-write-test") {
+            Task {
+                await hiddenSpaceWriteTest()
                 NSApp.terminate(nil)
             }
             return
@@ -99,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         updateDragLogging(granted: permission.isGranted)
+        #if DEBUG
+        // A first Space reading, so the first desktop switch can already report moved windows.
+        if permission.isGranted { Task { await logSpaceWindows() } }
+        #endif
         refreshWindowMenu()
 
         // The first-run explanation, once per launch while the permission is missing (UX-8).
@@ -170,7 +185,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func logSpaceWindows() async {
         guard AccessibilityPermission.isGranted else { return }
         let displays = self.displays?.table ?? DisplayTable(screens: [])
-        await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
+        let map = await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
+        SpaceDiagnostics.logMoves(from: lastSpaceMap, to: map)
+        lastSpaceMap = map
     }
 
     /// "Tile now" (US-4). For the owner's windows it stays switched off until the owner agrees
@@ -282,6 +299,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: false, windowLimits: entries)
             : MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
                         canTileNow: false, needsPermission: true, windowLimits: entries)
+    }
+
+    private func hiddenSpaceWriteTest() async {
+        let service = SkyLightSpaceService.shared
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        let apps = AppInfo.runningRegularApps().filter { $0.bundleID == "com.66ideas.tile32.FakeWindows" }
+        let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: service)
+        guard let record = scan.registry.records.values.first(where: { WindowClassifier.classify($0.snapshot) == .tiled }),
+              let number = record.snapshot.windowNumber, let original = record.snapshot.frame else {
+            Log.spaces.error("S3 hidden write: no FakeWindows window found")
+            return
+        }
+        Log.spaces.info("S3 hidden write: watching w\(number); waiting up to 90 s for it to be moved to another desktop")
+        let start = ContinuousClock.now
+        while ContinuousClock.now - start < .seconds(90) {
+            let shown = Set(service.currentSpaces(on: displays).values.map(\.id))
+            if let spaces = service.spaces(of: [number])[number], !spaces.isEmpty, shown.isDisjoint(with: spaces) {
+                try? await Task.sleep(for: .seconds(1))
+                let target = original.offsetBy(dx: 200, dy: 100)
+                let result = await AXWorker.shared.run(for: record.snapshot.app.pid) {
+                    FrameWriter.write(target, to: record.snapshot.element, pid: record.snapshot.app.pid)
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+                let server = WindowServerList.window(number: number)?.bounds
+                Log.spaces.info("""
+                    S3 hidden write: w\(number) on \(spaces.map(\.description).joined(separator: ","), privacy: .public): \
+                    errors \(result.sizeError.rawValue)/\(result.positionError.rawValue), \
+                    requested \(String(describing: target), privacy: .public), \
+                    Accessibility reads \(result.actual.map { String(describing: $0) } ?? "nothing", privacy: .public), \
+                    window server reports \(server.map { String(describing: $0) } ?? "nothing", privacy: .public)
+                    """)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        Log.spaces.info("S3 hidden write: the window was not moved within 90 s")
     }
 
     /// "Untile" (US-24): restores every window and shows it in the status line.
