@@ -261,6 +261,26 @@ public final class TilingCoordinator {
         return share
     }
 
+    /// "Make sizes equal" (US-28.9).
+    public func makeSizesEqual() async {
+        guard state == .running else { return }
+        while running { try? await Task.sleep(for: .milliseconds(20)) }
+        running = true
+        defer { running = false }
+        let observation = await observe()
+        lastObservation = observation
+        let snapshots = Dictionary(observation.records.map { ($0.id, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        _ = await engine.equalizeShown(displays: observation.displays, currentSpaces: observation.currentSpaces, snapshots: snapshots)
+        lastWrite = .now
+        onChange()
+    }
+
+    /// Shares of the display width for the Windows submenu (UX-6).
+    public func widthShares() async -> [WindowID: Double] {
+        let table = displays()
+        return await engine.widthShares(displays: table, currentSpaces: spaceService.currentSpaces(on: table))
+    }
+
     /// "Tile now" while running: arranges afresh and keeps tiling (US-4.6).
     public func tileNow() async -> ReconcileSummary {
         let summary = await engine.reconcile(await observe(), limits: limits(), rebuild: true)

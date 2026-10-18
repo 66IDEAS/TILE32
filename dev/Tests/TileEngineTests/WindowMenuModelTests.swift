@@ -93,4 +93,12 @@ struct WindowMenuModelTests {
         )
         #expect(content.sections.first?.entries.map(\.text) == ["Slack - General  (does not fit)"])
     }
+
+    @Test func sharesAreShownRounded() {
+        let content = WindowMenuModel.build(
+            records: [record(1, app: "Mail", title: "Inbox", display: dell), record(2, app: "Safari", title: "Apple", display: dell)],
+            displays: displays, currentSpaces: [:], otherSpacesCount: 0, shares: [WindowID(1): 0.5, WindowID(2): 0.2504]
+        )
+        #expect(content.sections.first?.entries.map(\.text) == ["Mail - Inbox  50%", "Safari - Apple  25%"])
+    }
 }

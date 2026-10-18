@@ -69,6 +69,7 @@ public struct MenuState: Sendable, Equatable {
 /// Commands the menu sends. The app wires them to the engine.
 public struct MenuActions {
     public var tileNow: @MainActor () -> Void
+    public var makeSizesEqual: @MainActor () -> Void
     /// The menu is about to open: a good moment to refresh the window list (US-3.3).
     public var menuWillOpen: @MainActor () -> Void
     /// The user chose a window in the "Windows" submenu (US-3.4).
@@ -86,6 +87,7 @@ public struct MenuActions {
 
     public init(
         tileNow: @escaping @MainActor () -> Void,
+        makeSizesEqual: @escaping @MainActor () -> Void = {},
         menuWillOpen: @escaping @MainActor () -> Void = {},
         raiseWindow: @escaping @MainActor (WindowID) -> Void = { _ in },
         setWindowLimit: @escaping @MainActor (String, Int) -> Void = { _, _ in },
@@ -99,6 +101,7 @@ public struct MenuActions {
         diagnostics: @escaping @MainActor () -> String
     ) {
         self.tileNow = tileNow
+        self.makeSizesEqual = makeSizesEqual
         self.menuWillOpen = menuWillOpen
         self.raiseWindow = raiseWindow
         self.setWindowLimit = setWindowLimit

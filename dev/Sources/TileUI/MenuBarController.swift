@@ -79,6 +79,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         let tileNow = ActionMenuItem(title: "Tile now") { [actions] in actions.tileNow() }
         tileNow.isEnabled = state.canTileNow
         menu.addItem(tileNow)
+        let equal = ActionMenuItem(title: "Make sizes equal") { [actions] in actions.makeSizesEqual() }
+        equal.isEnabled = state.canTileNow
+        menu.addItem(equal)
         menu.addItem(windowsItem())
         menu.addItem(.separator())
         menu.addItem(windowLimitItem())

@@ -41,4 +41,29 @@ extension LayoutEngine {
         let horizontal = edges.contains(.left) || edges.contains(.right)
         return Double(horizontal ? tile.width / inner.width : tile.height / inner.height)
     }
+
+    /// "Make sizes equal" (US-28.9): equal proportions in every shown layout, arrangement kept.
+    public func equalizeShown(displays: DisplayTable, currentSpaces: [DisplayID: SpaceInfo],
+                              snapshots: [WindowID: WindowSnapshot]) async -> Int {
+        for display in displays.displays {
+            let key = LayoutKey(space: currentSpaces[display.id]?.id, display: display.id)
+            if let tree = trees[key] { trees[key] = tree.equalized() }
+        }
+        let batch = frameBatch(displays: displays, currentSpaces: currentSpaces, snapshots: snapshots)
+        _ = await apply(batch)
+        return batch.count
+    }
+
+    /// Each tiled window's share of its display's width, for the Windows submenu (UX-6).
+    /// Layouts with a single window are left out.
+    public func widthShares(displays: DisplayTable, currentSpaces: [DisplayID: SpaceInfo]) -> [WindowID: Double] {
+        var shares: [WindowID: Double] = [:]
+        for display in displays.displays {
+            let key = LayoutKey(space: currentSpaces[display.id]?.id, display: display.id)
+            guard let tree = trees[key], tree.windowIDs.count > 1 else { continue }
+            let inner = display.usableArea.insetBy(dx: Self.gap / 2, dy: Self.gap / 2)
+            for (id, tile) in tree.rawShares(in: inner) { shares[id] = Double(tile.width / inner.width) }
+        }
+        return shares
+    }
 }

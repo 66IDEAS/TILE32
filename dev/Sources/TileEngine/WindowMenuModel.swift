@@ -37,7 +37,8 @@ public enum WindowMenuModel {
         currentSpaces: [DisplayID: SpaceInfo],
         otherSpacesCount: Int,
         minimisedToMakeRoom: Set<WindowID> = [],
-        doesNotFit: Set<WindowID> = []
+        doesNotFit: Set<WindowID> = [],
+        shares: [WindowID: Double] = [:]
     ) -> WindowMenuContent {
         // Primary display first, then the others from left to right.
         let ordered = displays.displays.sorted { a, b in
@@ -56,7 +57,12 @@ public enum WindowMenuModel {
             let onDisplay = sortedRecords.filter { $0.display == display.id }
             let entries = onDisplay
                 .filter { WindowClassifier.classify($0.snapshot) == .tiled }
-                .map { WindowMenuEntry(id: $0.id, text: entryText($0.snapshot) + (doesNotFit.contains($0.id) ? "  (does not fit)" : "")) }
+                .map { record in
+                    var text = entryText(record.snapshot)
+                    if let share = shares[record.id] { text += "  \(Int((share * 100).rounded()))%" }
+                    if doesNotFit.contains(record.id) { text += "  (does not fit)" }
+                    return WindowMenuEntry(id: record.id, text: text)
+                }
                 + onDisplay
                 .filter { minimisedToMakeRoom.contains($0.id) && WindowClassifier.classify($0.snapshot) == .minimised }
                 .map { WindowMenuEntry(id: $0.id, text: "\(entryText($0.snapshot))  (minimised to make room)") }
@@ -91,7 +97,8 @@ public enum WindowMenuLoader {
     }
 
     public static func load(apps: [AppInfo], displays: DisplayTable, spaceService: SpaceService,
-                            minimisedToMakeRoom: Set<WindowID> = [], doesNotFit: Set<WindowID> = []) async -> Result {
+                            minimisedToMakeRoom: Set<WindowID> = [], doesNotFit: Set<WindowID> = [],
+                            shares: [WindowID: Double] = [:]) async -> Result {
         let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: spaceService)
         let current = spaceService.currentSpaces(on: displays)
         let shown = Set(current.values.map(\.id))
@@ -108,7 +115,7 @@ public enum WindowMenuLoader {
         let records = Array(scan.registry.records.values)
         let content = WindowMenuModel.build(records: records, displays: displays, currentSpaces: current,
                                             otherSpacesCount: elsewhere, minimisedToMakeRoom: minimisedToMakeRoom,
-                                            doesNotFit: doesNotFit)
+                                            doesNotFit: doesNotFit, shares: shares)
         return Result(content: content, windows: scan.registry.records.mapValues(\.snapshot))
     }
 }

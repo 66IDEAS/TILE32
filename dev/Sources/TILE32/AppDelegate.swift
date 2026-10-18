@@ -56,6 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state: baseMenuState(),
             actions: MenuActions(
                 tileNow: { [weak self] in self?.tileNowFromMenu() },
+                makeSizesEqual: { [weak self] in
+                    guard let coordinator = self?.coordinator else { return }
+                    Task { await coordinator.makeSizesEqual() }
+                },
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
                 raiseWindow: { [weak self] id in self?.raise(id) },
                 setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
@@ -253,8 +257,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             let minimised = await engine.minimisedByEngine
             let notFitting = await engine.doesNotFit
+            let shares = await coordinator?.widthShares() ?? [:]
             let result = await WindowMenuLoader.load(apps: apps, displays: table, spaceService: SkyLightSpaceService.shared,
-                                                     minimisedToMakeRoom: minimised, doesNotFit: notFitting)
+                                                     minimisedToMakeRoom: minimised, doesNotFit: notFitting, shares: shares)
             listedWindows = result.windows
             menuBar?.setWindowContent(result.content)
             refreshingMenu = false
