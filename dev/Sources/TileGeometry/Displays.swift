@@ -98,6 +98,21 @@ public struct DisplayTable: Sendable, Equatable {
         return best
     }
 
+    /// The frame moved, and if needed shrunk, so that it lies fully inside a display's usable
+    /// area (US-24.3, N-5). A frame already inside one is returned unchanged. Otherwise the
+    /// display holding most of it is used, or the primary display if none holds any part.
+    public func clampedIntoView(_ frame: CGRect) -> CGRect {
+        if displays.contains(where: { $0.usableArea.contains(frame) }) { return frame }
+        guard let target = display(mostlyContaining: frame) ?? displays.first(where: \.isPrimary) ?? displays.first else {
+            return frame
+        }
+        let area = target.usableArea
+        let width = min(frame.width, area.width), height = min(frame.height, area.height)
+        let x = min(max(frame.minX, area.minX), area.maxX - width)
+        let y = min(max(frame.minY, area.minY), area.maxY - height)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
     /// Converts the mouse location (AppKit) to Accessibility coordinates.
     public func axPoint(fromAppKit point: CGPoint) -> CGPoint {
         CoordinateConversion.axPoint(fromAppKit: point, primaryHeight: primaryHeight)

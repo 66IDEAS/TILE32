@@ -75,4 +75,15 @@ struct DisplayTableTests {
         #expect(only.displays.count == 1)
         #expect(only.displays[0].isPrimary)
     }
+
+    @Test func clampingKeepsVisibleFramesAndPullsOthersIntoView() {
+        let visible = CGRect(x: 100, y: 100, width: 800, height: 600)
+        #expect(table.clampedIntoView(visible) == visible)
+        // Hanging off the right edge of the Dell: moved left, size kept.
+        #expect(table.clampedIntoView(CGRect(x: 4800, y: 100, width: 800, height: 600)) == CGRect(x: 4320, y: 100, width: 800, height: 600))
+        // Under the menu bar: moved down into the usable area.
+        #expect(table.clampedIntoView(CGRect(x: 100, y: 0, width: 800, height: 600)) == CGRect(x: 100, y: 30, width: 800, height: 600))
+        // On no display at all: placed on the primary display, shrunk to fit.
+        #expect(table.clampedIntoView(CGRect(x: 9000, y: 0, width: 6000, height: 2000)) == CGRect(x: 0, y: 30, width: 5120, height: 1353))
+    }
 }

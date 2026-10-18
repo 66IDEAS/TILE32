@@ -83,6 +83,12 @@ public actor LayoutEngine {
     /// Windows TILE32 minimised to respect a window limit (rule L9). Windows the user
     /// minimised are never in here, so TILE32 never brings those back (US-31.8).
     public private(set) var minimisedByEngine: Set<WindowID> = []
+    /// Each window's frame before TILE32 first moved or minimised it (TA-18), with the
+    /// snapshot needed to write it back.
+    private var originals: [WindowID: (window: WindowSnapshot, frame: CGRect)] = [:]
+
+    /// True when "Untile" has something to restore (US-24.6).
+    public var canUntile: Bool { !originals.isEmpty }
     private var expected: [WindowID: ExpectedFrame] = [:]
     private var generation: UInt64 = 0
     private let writer: FrameWriting
@@ -118,6 +124,11 @@ public actor LayoutEngine {
         for record in tiled {
             guard let displayID = record.display else { continue }
             groups[LayoutKey(space: currentSpaces[displayID]?.id, display: displayID), default: []].append(record)
+        }
+
+        // Remember where every window was before TILE32 touches it (TA-18).
+        for record in tiled where originals[record.id] == nil {
+            if let frame = record.snapshot.frame { originals[record.id] = (record.snapshot, frame) }
         }
 
         // Most recently used first (TA-27); windows the order does not know come last.
@@ -172,6 +183,39 @@ public actor LayoutEngine {
         }
         let summary = TileSummary(layouts: layouts, windows: batch.count, matched: matched, doesNotFit: notFitting, failed: failed)
         Log.layout.info("Tiled \(summary.windows) windows in \(summary.layouts) layouts: \(matched) matched, \(notFitting) do not fit, \(failed) failed")
+        return summary
+    }
+
+    public struct UntileSummary: Sendable, Equatable {
+        public let restored: Int
+        public let unminimised: Int
+        public let failed: Int
+    }
+
+    /// "Untile" (US-24): brings back the windows TILE32 minimised, writes every original
+    /// frame back (moved into view if its display is gone), and forgets all layouts.
+    public func untile(displays: DisplayTable) async -> UntileSummary {
+        let toRestore = minimisedByEngine.compactMap { id in originals[id].map { (id, $0.window) } }
+        let failedRestore = await writer.setMinimised(toRestore, false)
+        minimisedByEngine.removeAll()
+
+        let batch = originals.map { id, original in
+            FrameAssignment(id: id, window: original.window, frame: displays.clampedIntoView(original.frame))
+        }
+        generation += 1
+        let deadline = ContinuousClock.now + Self.expectationWindow
+        for item in batch {
+            expected[item.id] = ExpectedFrame(frame: item.frame, generation: generation, deadline: deadline)
+        }
+        let results = await writer.write(batch)
+        let failed = batch.filter { results[$0.id]?.matches != true && results[$0.id]?.doesNotFit != true }.count
+
+        originals.removeAll()
+        trees.removeAll()
+        doesNotFit.removeAll()
+        let summary = UntileSummary(restored: batch.count - failed, unminimised: toRestore.count - failedRestore.count,
+                                    failed: failed + failedRestore.count)
+        Log.layout.info("Untile: \(summary.restored) restored, \(summary.unminimised) brought back, \(summary.failed) failed")
         return summary
     }
 

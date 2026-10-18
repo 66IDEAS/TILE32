@@ -83,6 +83,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(windowLimitItem())
         menu.addItem(.separator())
+        let untile = ActionMenuItem(title: "Untile") { [actions] in actions.untile() }
+        untile.isEnabled = state.canUntile && !state.needsPermission
+        menu.addItem(untile)
+        menu.addItem(.separator())
 
         #if DEBUG
         menu.addItem(debugItem())

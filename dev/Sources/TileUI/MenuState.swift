@@ -48,15 +48,18 @@ public struct MenuState: Sendable, Equatable {
     /// Leads the menu with "Open Accessibility settings..." and greys window items (UX-5).
     public var needsPermission: Bool
     public var windowLimits: [WindowLimitMenuEntry]
+    /// "Untile" is available whenever there is something to restore (US-24.6).
+    public var canUntile: Bool
 
     public init(icon: IconState, statusLine: String, notFitCount: Int = 0, canTileNow: Bool, needsPermission: Bool = false,
-                windowLimits: [WindowLimitMenuEntry] = []) {
+                windowLimits: [WindowLimitMenuEntry] = [], canUntile: Bool = false) {
         self.icon = icon
         self.statusLine = statusLine
         self.notFitCount = notFitCount
         self.canTileNow = canTileNow
         self.needsPermission = needsPermission
         self.windowLimits = windowLimits
+        self.canUntile = canUntile
     }
 }
 
@@ -69,6 +72,7 @@ public struct MenuActions {
     public var raiseWindow: @MainActor (WindowID) -> Void
     /// The user picked a window limit for a display (US-31.2).
     public var setWindowLimit: @MainActor (String, Int) -> Void
+    public var untile: @MainActor () -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -81,6 +85,7 @@ public struct MenuActions {
         menuWillOpen: @escaping @MainActor () -> Void = {},
         raiseWindow: @escaping @MainActor (WindowID) -> Void = { _ in },
         setWindowLimit: @escaping @MainActor (String, Int) -> Void = { _, _ in },
+        untile: @escaping @MainActor () -> Void = {},
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -92,6 +97,7 @@ public struct MenuActions {
         self.menuWillOpen = menuWillOpen
         self.raiseWindow = raiseWindow
         self.setWindowLimit = setWindowLimit
+        self.untile = untile
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces

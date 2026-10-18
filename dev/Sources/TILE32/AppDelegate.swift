@@ -54,6 +54,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        // `--tile-then-untile-fakewindows`: Tile now on FakeWindows only, wait 3 seconds, Untile.
+        if CommandLine.arguments.contains("--tile-then-untile-fakewindows") {
+            Task {
+                await tileNow(onlyBundleID: "com.66ideas.tile32.FakeWindows")
+                try? await Task.sleep(for: .seconds(3))
+                _ = await engine.untile(displays: displays?.table ?? DisplayTable(screens: []))
+                NSApp.terminate(nil)
+            }
+            return
+        }
         if CommandLine.arguments.contains("--dump-spaces") {
             Task {
                 logSpaceDiagnostics(windows: false)
@@ -74,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
                 raiseWindow: { [weak self] id in self?.raise(id) },
                 setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
+                untile: { [weak self] in self?.untileFromMenu() },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -271,6 +282,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: false, windowLimits: entries)
             : MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
                         canTileNow: false, needsPermission: true, windowLimits: entries)
+    }
+
+    /// "Untile" (US-24): restores every window and shows it in the status line.
+    private func untileFromMenu() {
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        Task {
+            _ = await engine.untile(displays: displays)
+            var state = menuState(permissionGranted: permission?.isGranted ?? false)
+            state.statusLine = "Windows restored - tiling paused"
+            menuBar?.update(state)
+        }
     }
 
     /// US-31.2: remembered per display. Applying a new limit to tiled layouts at once is T-1.14.

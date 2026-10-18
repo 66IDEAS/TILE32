@@ -202,3 +202,43 @@ struct WindowLimitTests {
         #expect(writer.minimised == [WindowID(2)])
     }
 }
+
+@Suite("Untile (US-24)")
+struct UntileTests {
+    @Test func everythingGoesBackIncludingMinimisedWindows() async {
+        let writer = FakeWriter()
+        let engine = LayoutEngine(writer: writer)
+        var limits = WindowLimits()
+        limits.set(2, for: dell)
+        let records = [record(1, x: 100, display: dell), record(2, x: 900, display: dell), record(3, x: 1700, display: dell)]
+        _ = await engine.tileNow(records: records, displays: displays, currentSpaces: [dell: space], limits: limits,
+                                 recency: [WindowID(1), WindowID(2), WindowID(3)])
+        #expect(writer.minimised == [WindowID(3)])
+        #expect(await engine.canUntile)
+
+        let summary = await engine.untile(displays: displays)
+        #expect(summary == LayoutEngine.UntileSummary(restored: 3, unminimised: 1, failed: 0))
+        #expect(writer.minimised.isEmpty)
+        for original in records {
+            #expect(writer.written[original.id] == original.snapshot.frame)
+        }
+        #expect(await engine.minimisedByEngine.isEmpty)
+        #expect(await engine.trees.isEmpty)
+        #expect(await !engine.canUntile)
+    }
+
+    @Test func theFirstFrameIsKeptAcrossSeveralTileNow() async {
+        let writer = FakeWriter()
+        let engine = LayoutEngine(writer: writer)
+        let first = record(1, x: 100, display: dell)
+        _ = await engine.tileNow(records: [first], displays: displays, currentSpaces: [dell: space])
+        // A second "Tile now" sees the window at its tiled position; Untile must still use the first frame.
+        let moved = WindowRecord(id: first.id, snapshot: WindowSnapshot(
+            app: first.snapshot.app, element: first.snapshot.element, windowNumber: 1, role: "AXWindow",
+            subrole: "AXStandardWindow", title: "", frame: CGRect(x: 6, y: 36, width: 5108, height: 1341),
+            isMinimized: false, isFullScreen: false, isModal: false, isResizable: true), display: dell, spaces: [SpaceID(4)])
+        _ = await engine.tileNow(records: [moved], displays: displays, currentSpaces: [dell: space])
+        _ = await engine.untile(displays: displays)
+        #expect(writer.written[WindowID(1)] == first.snapshot.frame)
+    }
+}

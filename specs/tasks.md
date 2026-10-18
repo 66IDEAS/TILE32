@@ -368,10 +368,11 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Done when:** excluding Zoom floats its windows at once and the rest re-flow, removing it brings them back, and the list survives a restart.
 - **Depends on:** T-3.1
 
-### [ ] T-3.3 Untile
+### [~] T-3.3 Untile
 - **Do:** Restore the recorded original frames, clamp them to visible display areas, restore windows on hidden Spaces when their Space is next shown, then pause. "Untile" is available while running and paused, and grey only when there is nothing to restore.
 - **Traces:** US-24, TA-18, UX-4, UX-9
 - **Done when:** after tiling and rearranging, "Untile" puts every window back within two seconds on the visible Spaces, the status line reads "Windows restored - tiling paused", and windows on other Spaces are restored on their next visit.
+- **Progress (built early, in M0):** moved forward so that the owner's windows can always be restored before "Tile now" is switched on for them (UX-1 principle 2). Done: original frames recorded before the first move (TA-18), "Untile" menu item, windows minimised to make room brought back (US-24.8), frames moved into view when their display is gone (`DisplayTable.clampedIntoView`, US-24.3), layouts forgotten afterwards, status line "Windows restored - tiling paused". 3 new tests. Real check on 2026-10-18 with `--tile-then-untile-fakewindows` (FakeWindows only, limit 4): all six windows came back to their exact positions and sizes, including the two that had been minimised. Open for M1 and M3: the paused state after Untile (needs T-1.1), availability while paused, and windows on hidden Spaces restored on their next visit (US-24.7).
 - **Depends on:** T-1.5
 
 ### [ ] T-3.4 Start at login
