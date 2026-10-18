@@ -89,3 +89,28 @@ Run with the debug build logging every Space switch. Window titles are not recor
 - **Window carried while switching (Finder, title bar held, Ctrl + right arrow):** the Space switch came 1 second after the press, and the move was reported immediately. The drag tracker classified the gesture as a click, because the window did not move relative to the cursor. **Rule for TA-14:** a Space switch while the button is down ends the gesture without a drop; the move itself is handled by US-29.
 - **Windows on all desktops:** an Xcode window that is on every Space was reported as "moved" on every switch, because the list of Spaces came back in a different order. Fixed: Spaces are compared as sets.
 - **Apps that did not answer** in time varied from switch to switch (WhatsApp, ChatGPT, Outlook, WhichSpace); none blocked a reading.
+
+## Session A, part 2: full screen and writing to a hidden desktop (2026-10-18, owner session)
+
+- **Full screen:** entering full screen created a Space of type 4 (Space 903, no desktop number), reported at once; switching away, back, and leaving full screen were all reported correctly. TA-16 and US-30 are confirmed.
+- **Writing to a window whose desktop is not shown:** a FakeWindows window was read while visible on desktop 2. When the owner opened Mission Control and desktop 3 came up, desktop 2 counted as not shown, and the test wrote a frame 200 points to the right and 100 points down. The write returned no error, Accessibility read the new frame back, and the window server later reported exactly that frame. **An element read while its window was visible stays valid, and frames can be written to it while its desktop is hidden.** The owner saw the window already at its new place when looking at desktop 3.
+- **Mission Control:** while it is open, the window server reports scaled frames (here 562 x 397 for a 640 x 452 window). TILE32 must never take frames from the window server during Mission Control; it reads frames through Accessibility.
+
+**Consequences for the design:**
+1. The rule "TILE32 never writes to windows on hidden desktops" stays, as a product decision (nothing changes where the user cannot see it), not because writing is impossible.
+2. "Untile" can restore windows on hidden desktops at once, as long as their Accessibility element was read while they were visible. US-24.7 ("restored on the next visit") becomes a fallback for windows TILE32 never saw.
+3. Accessibility lists only the windows of the shown desktop (S3, confirmed again). Dormant layouts keep window numbers, and the elements are kept from the last visit.
+
+## Space UUIDs before a logout (2026-10-18, for the S6 question "do UUIDs survive a logout")
+
+| Space | Type | Desktop | UUID |
+|---|---|---|---|
+| 3 | desktop | 1 | (desktop UUID removed) |
+| 4 | desktop | 2 | (desktop UUID removed) |
+| 5 | desktop | 3 | (desktop UUID removed) |
+| 6 | desktop | 4 | (desktop UUID removed) |
+| 7 | desktop | 5 | (desktop UUID removed) |
+| 8 | desktop | 6 | (desktop UUID removed) |
+| 9 | desktop | 7 | (desktop UUID removed) |
+
+After the owner's next logout or restart, "Log Spaces" is compared with this table.

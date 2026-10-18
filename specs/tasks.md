@@ -141,10 +141,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** "Log Spaces" and "Log windows" in the Debug submenu, an automatic full log on every Space switch in debug builds, `--dump-spaces` for scripted runs, and `WindowServerList` (public window list, also the base of the fallback mode). First run recorded in `specs/spikes.md`. Done 2026-10-18.
 - **Depends on:** T-0.13, T-0.14
 
-### [ ] T-0.18 [owner] Spike session A: Spaces (S6, S3)
+### [~] T-0.18 [owner] Spike session A: Spaces (S6, S3)
 - **Do:** The owner, following a short script from Claude: creates up to 16 Spaces on the ultrawide, switches between them, moves a window to another Space through Mission Control and through drag plus Ctrl+arrow, puts one window into full screen and out again, turns "Displays have separate Spaces" off and on (this needs a logout), and logs out and in once to check the UUIDs. Claude reads the logs. One step also tests whether a frame can be written to a window on a hidden Space.
 - **Traces:** S6, S3, US-12, US-29, US-30, C-5
 - **Done when:** every question of S6 and S3 has an answer in `specs/spikes.md`, and TA-16 and TA-26 are confirmed or a revision is proposed to the owner. The question about a notarized build is carried over to T-3.8.
+- **Progress:** parts 1 and 2 done on 2026-10-18 (desktop switches, moves with Mission Control and by carrying a window, full screen, writing to a window on a hidden desktop); results in `specs/spikes.md`, TA-16 updated. Open: "Displays have separate Spaces" switched on (optional, needs two logouts) and UUID stability, which is checked after the owner's next natural logout against the table in `specs/spikes.md`.
 - **Depends on:** T-0.17
 
 ### [x] T-0.19 Spike tool for frame writing (S2)
