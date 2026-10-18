@@ -449,11 +449,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Depends on:** T-3.1 to T-3.6
 - **Result:** every string of UX-15 is in the app with the same wording; no em dash in sources, tests or resources; no exclamation mark in a user-visible string; sentence case throughout ("Spaces" and "TILE32" are proper names). The table in UX-15 was updated for the three extra debug items and the fuller "does not fit" status line. Done 2026-10-18.
 
-### [ ] T-3.8 [owner] Release build and notarization
+### [~] T-3.8 [owner] Release build and notarization
 - **Do:** Complete `./build-app.sh release`: sign with "Developer ID Application: Alexander Ilg (AHBM4Y6VPX)" with secure timestamp and hardened runtime, submit with `xcrun notarytool submit --wait`, and staple. The owner stores the notarization credentials once with `notarytool store-credentials` (Claude never handles the password). Check that the notarized build still finds the four Space functions (carried over from S6).
 - **Traces:** N-11, TA-22, TA-26, S6
 - **Done when:** `spctl --assess --type execute` accepts the stapled app, it runs on a clean user account, and the Space functions are reported as found.
 - **Depends on:** T-3.7
+- **Progress:** `./build-app.sh TILE32 release` builds the release configuration into `dev/build/release/TILE32.app` and signs it with the Developer ID, a secure timestamp and the hardened runtime. `codesign --verify --strict` passes. In the signed release build, `--dump-spaces` reports all four Space functions as found. The script then checks for the keychain profile `TILE32`. Without it, the script stops with exit code 2 and prints the one-time command for the owner. With it, the script zips, submits with `notarytool submit --wait`, staples and runs `spctl --assess`. Waiting for the owner: run `xcrun notarytool store-credentials TILE32 --apple-id <Apple ID> --team-id AHBM4Y6VPX` once, then `./build-app.sh TILE32 release`, then start the app on a clean user account. 2026-10-18.
 
 ### [~] T-3.9 Remember layouts across restarts (candidate)
 - **Do:** Store each layout (with weights) per Space UUID and display, with window descriptors (bundle id, title, index). On start, match windows and rebuild trees; unmatched windows are appended. Decide with the owner whether to keep it (OQ-7).
