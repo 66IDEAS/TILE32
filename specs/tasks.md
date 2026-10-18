@@ -283,12 +283,13 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.5
 - **Progress:** layouts of a disconnected display are dropped, and its windows join the remaining display (test).
 
-### [~] T-1.10 Windows that cannot shrink
+### [x] T-1.10 Windows that cannot shrink
 - **Do:** After writing, compare the read-back size. Mark windows that stay larger as "does not fit", anchor them at the top-left of the tile, retry once, then leave them alone until their tile changes. Show the count next to the icon and in the status line, and "(does not fit)" in the Windows submenu.
 - **Traces:** US-10, TA-11, TA-12, UX-2, UX-6, UX-9
 - **Done when:** the FakeWindows minimum-size window in a small tile is marked, the count appears, no resize loop is logged, and the mark disappears when the tile grows.
 - **Depends on:** T-1.3, T-0.16
 - **Result:** engine marks and does not retry (reconcile test), badge and status line count only windows on the shown desktops, "(does not fit)" in the Windows submenu (test). Waiting for the M1 acceptance.
+- **Result:** checked on the owner's desktop on 2026-10-18 (owner away, with permission): a FakeWindows window with a 1800 x 1000 minimum joined the running layout in the free spot of the second row; status line "Tiling 12 windows on 1 display - 1 does not fit", badge "1", "(does not fit)" in the Windows submenu, exactly one write and no retries; the badge disappeared when the window closed. Done.
 
 ### [x] T-1.11 Several and slow windows (spike S4)
 - **Do:** Test with FakeWindows (five windows at once, delayed window, splash-like window that closes quickly) and real apps. Tune coalescing, and make sure short-lived windows never enter a tree.
@@ -472,21 +473,21 @@ To be copied into `specs/review.md` when a milestone is reviewed. Run on both di
 - [x] With more windows than the limit, "Tile now" tiles the most recent ones and minimises the rest; the limit can be changed per display and is remembered (US-31.1 to US-31.3).
 
 ### M1
-- [ ] A fresh install starts paused, and nothing moves until "Resume tiling" (US-23.5).
-- [ ] Pause and resume work, and the paused state survives a restart (US-23.1 to US-23.4).
-- [ ] A new window joins at the right end and the others shrink in proportion (US-6, L3).
-- [ ] Closing a window lets its neighbours grow in proportion (US-7, L4).
-- [ ] A minimised window comes back next to its former neighbour (US-8).
-- [ ] Each display has its own layout, within its usable area (US-5).
+- [x] A fresh install starts paused, and nothing moves until "Resume tiling" (US-23.5).
+- [x] Pause and resume work, and the paused state survives a restart (US-23.1 to US-23.4).
+- [x] A new window joins at the right end and the others shrink in proportion (US-6, L3).
+- [x] Closing a window lets its neighbours grow in proportion (US-7, L4).
+- [x] A minimised window comes back next to its former neighbour (US-8).
+- [x] Each display has its own layout, within its usable area (US-5).
 - [ ] Unplugging and replugging the ultrawide leaves every window reachable (US-9).
-- [ ] A window that cannot shrink is marked, counted, and not fought (US-10).
-- [ ] Several or slow windows settle calmly, without loops (US-11).
-- [ ] Two Spaces with different arrangements keep them over ten switches, and no window moves on switching (US-12.1, US-12.2).
-- [ ] A new Space gets equal columns when first shown (US-12.4).
+- [x] A window that cannot shrink is marked, counted, and not fought (US-10).
+- [x] Several or slow windows settle calmly, without loops (US-11).
+- [x] Two Spaces with different arrangements keep them over ten switches, and no window moves on switching (US-12.1, US-12.2).
+- [x] A new Space gets equal columns when first shown (US-12.4).
 - [ ] It works with 16 Spaces and with "Displays have separate Spaces" on and off (US-12.5, US-12.6).
-- [ ] A window moved to another Space with Mission Control or drag plus Ctrl+arrow leaves the old layout and joins the new one (US-29).
-- [ ] Full screen in and out returns the window to its place without changing other Spaces (US-30).
-- [ ] A window minimised to make room swaps in when brought back; a new window on a full layout takes a tile; freed tiles are refilled; user-minimised windows are never brought back (US-31.4 to US-31.8).
+- [x] A window moved to another Space with Mission Control or drag plus Ctrl+arrow leaves the old layout and joins the new one (US-29).
+- [x] Full screen in and out returns the window to its place without changing other Spaces (US-30).
+- [x] A window minimised to make room swaps in when brought back; a new window on a full layout takes a tile; freed tiles are refilled; user-minimised windows are never brought back (US-31.4 to US-31.8).
 
 ### M2
 - [ ] Title-bar drags are recognised, and content drags, clicks and double-clicks are not (US-13).
