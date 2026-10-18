@@ -30,6 +30,11 @@ public enum WindowScan {
     /// Writes the reading to the log: one line per app, one line per window.
     public static func log(_ result: Result, displays: DisplayTable) {
         Log.layout.info("Window scan: \(result.registry.records.count) windows in \(result.apps.count) apps, \(result.duration.formatted(.units(allowed: [.milliseconds])), privacy: .public)")
+        let classes = result.registry.records.values.map { WindowClassifier.classify($0.snapshot) }
+        let tiled = classes.filter { $0 == .tiled }.count
+        let minimised = classes.filter { $0 == .minimised }.count
+        let reasons = FloatReason.allCases.map { reason in "\(reason.rawValue) \(classes.filter { $0 == .floating(reason) }.count)" }
+        Log.layout.info("Classification: \(tiled) tiled, \(minimised) minimised, floating: \(reasons.joined(separator: ", "), privacy: .public)")
         for app in result.apps {
             Log.ax.info("""
                 App \(app.app.name, privacy: .public) pid \(app.app.pid): \(app.windows.count) windows, \
@@ -46,8 +51,13 @@ public enum WindowScan {
                 snapshot.isModal ? "modal" : nil,
                 snapshot.isResizable ? nil : "fixed size",
             ].compactMap { $0 }.joined(separator: ", ")
+            let classification: String = switch WindowClassifier.classify(snapshot) {
+            case .tiled: "tiled"
+            case .minimised: "minimised"
+            case .floating(let reason): "floating: \(reason.rawValue)"
+            }
             Log.layout.info("""
-                Window \(record.id.description, privacy: .public) \(snapshot.app.name, privacy: .public) \
+                Window \(record.id.description, privacy: .public) [\(classification, privacy: .public)] \(snapshot.app.name, privacy: .public) \
                 "\(Log.title(snapshot.title), privacy: .public)" \
                 \(snapshot.subrole ?? "no subrole", privacy: .public) \
                 frame \(snapshot.frame.map { String(describing: $0) } ?? "unknown", privacy: .public) \

@@ -40,3 +40,7 @@ From the first full reading in T-0.14 (debug dump mode, no window moved). Window
 - **Windows of other Spaces are probably not listed:** all 31 windows were on the current Space (id 4), except one minimised window that reported Space 8. Several apps with windows elsewhere listed none. This contradicts the assumption in TA-16 that `kAXWindowsAttribute` lists windows of all Spaces. If T-0.18 confirms it, TA-16 and TA-20 change: windows on hidden Spaces are known only through the window server list (window number, owner, Space), and their Accessibility element is read when their Space is shown. This does not affect the rule that TILE32 never writes to hidden Spaces.
 - **Classification inputs work:** subroles `AXStandardWindow`, `AXDialog` and `AXUnknown` (small floating helper windows) appear as expected, and fixed-size windows are detected.
 - One process reported pid -1 ("Device Hub"); apps without a valid pid are now skipped.
+
+## Observation for open question Q-3 (2026-10-18)
+
+The owner's current desktop holds **27 windows that would be tiled**, spread over both displays (most on the ultrawide). As equal columns, 25 windows on the 5120 point wide display would give tiles of about 200 points, the minimum of rule L8, which is not usable. Q-3 ("how many windows can one display hold") therefore matters before "Tile now" (T-0.24) arranges real windows. Options to put to the owner: tile only the windows of the frontmost apps, tile at most a fixed number per display and leave the rest floating, or fill a grid instead of columns when there are many windows.

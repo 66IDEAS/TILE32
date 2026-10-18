@@ -119,10 +119,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Progress:** `AXWorker` (queue per app, 0.5 s timeout, observer thread), `WindowReader`, `AXElementBox`, `WindowRegistry` and `WindowScan`. Debug builds can be started with `--dump-windows` to log every window and quit, so readings can be checked without opening menus. First reading on 2026-10-18: 31 windows in 37 apps in 662 ms, each with window number, display and Space (`specs/spikes.md`, S3). Open: the hung-app check, which needs the hang button of FakeWindows (T-0.16).
 - **Depends on:** T-0.12, T-0.13
 
-### [ ] T-0.15 Window classification, first version
+### [x] T-0.15 Window classification, first version
 - **Do:** Implement rules 1 to 5 of TA-10 (regular app, `AXStandardWindow`, resizable, not minimised, full screen or modal, minimum 200x120) with a floating reason for each rejected window. The exclude list (rule 6) follows in T-3.2.
 - **Traces:** TA-10, US-21 (partly)
 - **Done when:** with Finder, Safari, a save panel and a settings window open, the log shows the standard windows as tiled and the others as floating with the right reason.
+- **Result:** `WindowClassifier` in `TileEngine` with 10 unit tests; the dump shows the classification of every window. Real reading on 2026-10-18: 27 tiled, 1 minimised, floating: 1 dialog, 3 panels (two small helper windows and the Finder desktop window, which has no subrole and no window number), 1 not resizable. Excluded apps are already supported by the classifier and get their menu in T-3.2. Sheets and save panels are checked with FakeWindows in T-0.16. Done 2026-10-18.
 - **Depends on:** T-0.14
 
 ### [ ] T-0.16 FakeWindows test app
