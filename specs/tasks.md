@@ -214,12 +214,13 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 
 Goal: windows arrange themselves, every Space on every display keeps its own arrangement, and the first run starts paused.
 
-### [~] T-1.1 Engine run states and pause
+### [x] T-1.1 Engine run states and pause
 - **Do:** Add the run states `.running`, `.paused` and `.noPermission`. "Pause tiling" and "Resume tiling" in the menu, with the paused icon (UX-4). The paused flag is stored in `UserDefaults` with default `true`, so a fresh install starts paused and shows "Tiling paused - choose Resume tiling to start". Resume re-applies stored trees and adds or removes windows that changed while paused. US-23 is built here instead of M3, because the first-run pause (US-23.5) is needed as soon as tiling becomes automatic.
 - **Traces:** US-23, TA-17, TA-19, UX-4, UX-9, constitution product rule 5
 - **Done when:** a fresh install moves nothing until "Resume tiling", the paused state survives a restart, and resuming restores the stored layouts.
 - **Depends on:** T-0.24
 - **Result:** run states in `TilingCoordinator`, paused flag and "resumed once" in `UserDefaults` (fresh install starts paused), "Pause tiling" / "Resume tiling" in the menu, status lines and icon per UX-9 and UX-2, "Tile now" grey while paused, Untile pauses. Waiting for the owner check in the M1 acceptance.
+- **Result:** owner acceptance on 2026-10-18, steps 1, 2, 10 and 11: first-run status line, Resume, Pause without snapping back, resume puts windows back, the running state survives a restart. Done.
 
 ### [x] T-1.2 Observers and event coalescing
 - **Do:** Register the AX observers of TA-9 for every regular app and the workspace notifications for launch, terminate, hide and unhide. Feed every event into the engine's coalescing queue (120 ms quiet time, 400 ms maximum).
@@ -244,26 +245,29 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Progress:** `LayoutTree.returnHint` (4 tests) and its use in reconcile: minimised windows and windows of hidden apps come back next to their former neighbour; user-minimised windows are never brought back.
 - **Result:** live check: a minimised window came back next to its old neighbour; a hidden app left and came back. Done.
 
-### [~] T-1.5 Per-Space layouts
+### [x] T-1.5 Per-Space layouts
 - **Do:** On `activeSpaceDidChange`, ask `TileSpaces` for the shown Spaces. Leave the trees of hidden Spaces untouched, never write to their windows, reconcile the trees of shown Spaces (windows that left or arrived), and build a `flat` tree for a Space shown for the first time. Write frames only if a tree changed. Support "Displays have separate Spaces" on and off.
 - **Traces:** US-12, TA-3, TA-16, TA-26, flow 3.6, constitution product rule 6
 - **Done when:** engine tests with the fake Space service pass for switching between 16 Spaces with no write to a hidden Space, and on the real machine two Spaces with different arrangements keep them across ten switches.
 - **Depends on:** T-1.3, T-0.18
 - **Progress:** reconcile keeps one tree per Space and display, touches only the shown ones, and writes nothing when the user returns to an unchanged desktop (tests). Waiting for the Space switch trigger (with T-1.2).
+- **Result:** owner acceptance step 6: desktop 3 arranged on first visit, desktop 2 unchanged on return with nothing moving. Done.
 
-### [~] T-1.6 Moving windows between Spaces
+### [x] T-1.6 Moving windows between Spaces
 - **Do:** Detect a window whose Space no longer matches its tree. Remove it from the old tree (re-flow now if that Space is shown, otherwise when it is next shown) and append it to the new Space's tree.
 - **Traces:** US-29, TA-16, C-10
 - **Done when:** moving a window with Mission Control and with drag plus Ctrl+arrow leaves both Spaces tidy, and no other window changes its tile.
 - **Depends on:** T-1.5
 - **Progress:** a window moved to another desktop leaves the old layout and joins the new one when that desktop is shown (test). Open: noticing a move made in Mission Control while staying on the same desktop (session A).
+- **Result:** owner acceptance step 7: a window moved with Mission Control left desktop 2 within about a second (the one-second window-list check) and joined desktop 3. Done.
 
-### [~] T-1.7 Full-screen windows
+### [x] T-1.7 Full-screen windows
 - **Do:** On entering full screen, remove the window with a return hint. On leaving, put it back through the hint into the layout of the Space it returns to. Full-screen Spaces get no tree.
 - **Traces:** US-30, TA-10, TA-16
 - **Done when:** a window in a column of two goes to full screen and back and lands in the same place, and the other Spaces' arrangements are unchanged.
 - **Depends on:** T-1.5, T-1.4
 - **Progress:** full screen leaves with a return hint and comes back (test); a shown full-screen Space has no layout and is never touched.
+- **Result:** owner acceptance step 8: a window went to full screen and back and returned to its place. Done.
 
 ### [x] T-1.8 Fallback mode without Space information
 - **Do:** When `SpaceService.isAvailable` is false, use the public on-screen window list, keep one tree per display, never write to windows that are not on screen, and show "Spaces not detected - only visible windows are arranged".
@@ -286,13 +290,14 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.3, T-0.16
 - **Result:** engine marks and does not retry (reconcile test), badge and status line count only windows on the shown desktops, "(does not fit)" in the Windows submenu (test). Waiting for the M1 acceptance.
 
-### [ ] T-1.11 Several and slow windows (spike S4)
+### [x] T-1.11 Several and slow windows (spike S4)
 - **Do:** Test with FakeWindows (five windows at once, delayed window, splash-like window that closes quickly) and real apps. Tune coalescing, and make sure short-lived windows never enter a tree.
 - **Traces:** US-11, S4, TA-12
 - **Done when:** 10 minutes of the FakeWindows stress mode show no layout loop and no lost window, and the result is in `specs/spikes.md`.
 - **Depends on:** T-1.10
+- **Result:** passed on 2026-10-18 with a generated 6-minute stress script (254 actions); no loop, no lost window, clean end state (`specs/spikes.md`, S4). The planned 10 minutes were shortened to the time the owner was away. Done.
 
-### [~] T-1.14 Window limit while tiling automatically
+### [x] T-1.14 Window limit while tiling automatically
 - **Do:** Track focus for the recency order (`kAXFocusedWindowChanged`, app activation). Swap in a window that TILE32 minimised when the user brings it back, give new windows a tile on a full layout, bring back windows when a tile frees up, apply limit changes at once, never touch windows the user minimised, and suppress TILE32's own minimise notifications.
 - **Traces:** US-31.4 to US-31.10, TA-27, TA-12
 - **Done when:** engine tests cover every criterion of US-31, and on the real machine a 13th window on the Dell takes a tile while the least recently used one is minimised.
@@ -300,6 +305,7 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Progress:** reconcile swaps a new or returning window into the least recently used tile (front-to-back order as order of use), refills freed tiles with the last window TILE32 minimised, never brings back windows the user minimised (tests).
 - **Result:** live check on 2026-10-18 with FakeWindows and limit 3: a 4th window took the least recently used tile, a restored window swapped in, a closed window's tile was refilled. Waiting for the M1 acceptance with real apps.
 - **Errors found:** right after a swap, a reading during the minimise and restore animations saw the returning window as still minimised and swapped once more (flapping). Fixed: after a run that minimised, restored or took in a window, the next reading waits 800 ms. Re-run: exactly one cycle per step. Resolved 2026-10-18.
+- **Result:** owner acceptance step 9 failed first and was fixed (see T-1.13, D-9); re-checked with FakeWindows. Done.
 
 ### [x] T-1.12 Engine test coverage for M1
 - **Do:** Complete `TileEngineTests` with fakes for AX, geometry and Spaces for every M1 behaviour listed in TA-24 level 2.

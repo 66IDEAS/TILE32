@@ -152,3 +152,19 @@ The owner dragged, resized and clicked windows in Safari, Chrome, Slack, Teams, 
 **Unexplained:** in the first run, no press at all was logged for Finder, Terminal and VS Code, although the owner dragged them. In a later check with the current build, Finder and Terminal worked perfectly (4 of 4 drags). Possibly the first presses happened while TILE32 was being restarted. To watch in M2 acceptance.
 
 **Sample size:** fewer gestures than the planned 20 drags per app (owner's time); the result is clear enough to build M2 on.
+
+## S4 Notifications and feedback - passed (2026-10-18, stress test)
+
+Automatic tiling of FakeWindows windows only (`--auto-fakewindows`, limit 6), driven by a generated script of 254 actions over 5.7 minutes: open one window, open five at once, splash windows that close after 0.3 seconds, late windows, close, minimise, restore, hide and show the app. Run while the owner was away.
+
+| Measure | Result |
+|---|---|
+| Changing reconcile runs | 69 |
+| Arrivals / departures | 254 / 76 |
+| Minimised to make room / brought back | 229 / 49 |
+| Frames written | 265; 4 failed during animations and were corrected by the next run; 0 did not fit |
+| Loops | none: at most 4 changing runs within any 3 seconds, matching the pace of the script; nothing changed after the script ended |
+| End state | 124 test windows: 6 visible, exactly 6 equal columns on the Dell (limit 6, 846 points wide), 118 minimised; no window lost |
+| Cost | 14.5 s of CPU time over 6 minutes of continuous churn, 36 MB of memory |
+
+TA-9 and TA-12 are confirmed: observers plus the one-second window-list check catch every change, coalescing keeps runs few, and the settle time stops flapping.
