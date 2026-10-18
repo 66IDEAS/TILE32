@@ -46,10 +46,11 @@ These rules define how a layout behaves. They match the interactive reference pr
   - Top or bottom edge zone: the target is split one above the other, and the dragged window takes the top or bottom half respectively.
 - **L7. Gaps.** Tiles have a small even gap between them and to the display edge, so window borders stay visible.
 - **L8. Resizing.** Dragging a window edge moves the boundary between that window's tile and its neighbour in the same split. Only the two tiles on either side of the boundary change size; all other tiles keep theirs. No tile becomes smaller than 10 percent of its split or 200 points, whichever is larger. Boundaries snap to quarters and thirds of their split (25, 33, 50, 67, 75 percent) when released within 1 percent of one, so exact sizes such as 50, 25, 25 are easy to reach.
+- **L9. Window limit.** Each display has a limit for the number of tiled windows in one layout: by default 12 on displays at least 3840 points wide (the Dell U4924DW) and 6 on smaller displays (the laptop). The user can change the limit per display. When more windows would be tiled than the limit allows, the most recently used windows get tiles, and the others are minimised by TILE32. A window minimised this way takes the tile of the least recently used window when the user brings it back, and that window is minimised in its place, so windows never overlap.
 
 ## 5. User stories
 
-Stories are grouped by release slice. A slice is finished when all its stories pass their acceptance criteria. Story numbers are stable identifiers: stories added during review (US-28 to US-30) keep their numbers and are placed in the milestone where they belong.
+Stories are grouped by release slice. A slice is finished when all its stories pass their acceptance criteria. Story numbers are stable identifiers: stories added during review (US-28 to US-31) keep their numbers and are placed in the milestone where they belong.
 
 ---
 
@@ -86,6 +87,7 @@ Goal: prove that TILE32 can see and arrange windows of other apps.
 2. Floating windows are listed separately, marked as floating (see US-21).
 3. The list reflects the current state each time the menu is opened.
 4. Clicking a window in the list brings that window to the front.
+5. Windows that TILE32 minimised because of the window limit are listed under their display, marked as such, and choosing one swaps it in (US-31.4).
 
 #### US-4 Tile now
 
@@ -196,6 +198,22 @@ Goal: windows arrange themselves as they come and go, with a separate, remembere
 2. The moved window leaves the old Space's layout. The remaining windows there re-flow (rule L4), at the latest the next time that Space is shown.
 3. The moved window joins the new Space's layout as a new window (rule L3), on the display where that Space is.
 4. All other windows on both Spaces keep their tiles, apart from the re-flow in criterion 2.
+
+#### US-31 Window limit per display
+
+**Description:** As a user with many windows on one desktop, I want only a sensible number of windows tiled on each display, so that tiles stay large enough to use, and I want to choose that number myself.
+
+**Acceptance criteria:**
+1. Each display has a window limit (rule L9). The defaults are 12 for the Dell U4924DW and 6 for the laptop display.
+2. The menu has a "Window limit" submenu with one entry per display, where the user picks a limit from 2 to 16. The choice is remembered after a restart, per display.
+3. When a layout would hold more windows than the limit, the most recently used windows are tiled and the others are minimised by TILE32. "Most recently used" follows the order in which the user last had each window in front.
+4. When the user brings back a window that TILE32 minimised (from the Dock, the app's Window menu or the "Windows" submenu), it takes the tile of the least recently used tiled window, and that window is minimised instead. The arrangement and proportions stay the same.
+5. When a new window opens on a full layout, it gets a tile in the same way, and the least recently used window is minimised.
+6. When a tile becomes free (a window closes, moves away or is minimised by the user), the most recently used window that TILE32 minimised comes back into the layout (rule L3).
+7. Lowering a limit minimises the least recently used windows at once; raising it brings back windows that TILE32 minimised, most recently used first.
+8. Windows that the user minimised are never brought back by TILE32. Only windows that TILE32 minimised are swapped in automatically.
+9. Quitting TILE32 leaves windows that it minimised as they are. "Untile" brings them back to their original frames (US-24.8).
+10. While tiling is paused, nothing is minimised or brought back.
 
 #### US-30 Full-screen windows
 
@@ -363,6 +381,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 5. "Untile" works even when many windows are open and takes effect within two seconds.
 6. "Untile" is also available while tiling is paused, because pausing leaves the windows in their tiled positions. It is unavailable only when there is nothing to restore, for example right after an "Untile".
 7. Windows on Spaces that are not shown are restored the next time their Space is shown, because TILE32 never moves windows on hidden Spaces (US-12.3).
+8. Windows that TILE32 minimised because of the window limit (US-31) are brought back and restored to their original frames as well.
 
 #### US-25 Start at login
 
@@ -441,13 +460,13 @@ Goal: make TILE32 safe and pleasant for every day use.
 | D-4 | macOS moves windows between Spaces, and TILE32 follows (US-29, C-10). | 2026-10-18 |
 | D-5 | TILE32 starts paused on the first run (US-23.5). | 2026-10-18 |
 | D-6 | App identifier `com.66ideas.tile32` (N-12). | 2026-10-18 |
+| D-7 | Window limit per display, configurable, default 12 on the Dell U4924DW and 6 on the laptop. Extra windows are minimised and swapped in when used (US-31, rule L9). Replaces former Q-3. | 2026-10-18 |
 
 ## 10. Open questions
 
 | # | Question | Suggested default |
 |---|---|---|
 | Q-2 | Where should a new window go: always at the right end (as in the prototype), or next to the window that has focus? | Right end, as in the prototype. |
-| Q-3 | How many windows can one display hold before tiles become too small to use? Should extra windows stay floating, or go to a second layer? | No limit in version 1. Windows that cannot fit follow US-10. |
 | Q-4 | Should the layout be remembered across restarts of TILE32 (US-26), and how well can windows be recognised after a restart? | Keep US-26 as a candidate for the end of Milestone 3. |
 | Q-6 | Should "Quit TILE32" offer to untile first? | No. Windows stay where they are, and the user can use "Untile" before quitting. |
 | Q-7 | Should pause be per display or global? | Global. |

@@ -2,7 +2,7 @@
 
 Status: ready to start
 Date: 2026-10-18
-Sources: `specs/specifications.md` (US-1..US-30, L1-L8, N-1..N-12, C-1..C-10), `specs/architecture.md` (TA-1..TA-26, spikes S1-S7), `specs/ux.md` (UX-1..UX-16), `specs/constitution.md`
+Sources: `specs/specifications.md` (US-1..US-31, L1-L9, N-1..N-12, C-1..C-10), `specs/architecture.md` (TA-1..TA-26, spikes S1-S7), `specs/ux.md` (UX-1..UX-16), `specs/constitution.md`
 
 ## How to read this list
 
@@ -187,11 +187,17 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Progress:** `LayoutEngine` actor with trees per `LayoutKey` (Space and display), "Tile now" building `flat` trees ordered by left edge inside each usable area, batched writes per app through the `FrameWriting` protocol (`AXFrameWriter` for real windows), "does not fit" marking, and the expected-frame record of TA-12 with `isSelfCaused`. 6 engine tests with a fake writer. Real check on 2026-10-18 with `--tile-now-fakewindows` (FakeWindows only): 6 windows became 6 columns on the Dell, 846 to 847 points wide, exactly 6 points apart, the non-resizable control window untouched. Open: the menu item stays grey for the owner's windows until (1) session B (T-0.20) has run, (2) the owner agrees to a moment, and (3) open question Q-3 is decided, because the current desktop holds 27 windows that would be tiled.
 - **Depends on:** T-0.5, T-0.15, T-0.20
 
+### [ ] T-0.26 Window limit for Tile now
+- **Do:** Add the limits per display (`UserDefaults`, 2 to 16, defaults 12 and 6 by display width), the "Window limit" submenu, `LayoutTree.replacing(_:with:)` with tests, the recency order from the window server's front-to-back list, and make "Tile now" tile the most recent windows up to the limit and minimise the others, remembering them in `minimisedByEngine`. Status line and Windows submenu show windows minimised to make room.
+- **Traces:** US-31.1 to US-31.3, US-3.5, L9, TA-27, UX-17
+- **Done when:** engine tests cover the limit; with FakeWindows only and a limit of 4, "Tile now" tiles the four frontmost test windows and minimises the rest; the limit survives a restart.
+- **Depends on:** T-0.24
+
 ### [ ] T-0.25 [owner] M0 acceptance
 - **Do:** Go through the M0 checklist at the end of this file on both displays.
 - **Traces:** US-1 to US-4
 - **Done when:** all M0 items are ticked, or the failures are written down with a decision.
-- **Depends on:** T-0.1 to T-0.24
+- **Depends on:** T-0.1 to T-0.24, T-0.26
 
 ---
 
@@ -265,15 +271,21 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Done when:** 10 minutes of the FakeWindows stress mode show no layout loop and no lost window, and the result is in `specs/spikes.md`.
 - **Depends on:** T-1.10
 
+### [ ] T-1.14 Window limit while tiling automatically
+- **Do:** Track focus for the recency order (`kAXFocusedWindowChanged`, app activation). Swap in a window that TILE32 minimised when the user brings it back, give new windows a tile on a full layout, bring back windows when a tile frees up, apply limit changes at once, never touch windows the user minimised, and suppress TILE32's own minimise notifications.
+- **Traces:** US-31.4 to US-31.10, TA-27, TA-12
+- **Done when:** engine tests cover every criterion of US-31, and on the real machine a 13th window on the Dell takes a tile while the least recently used one is minimised.
+- **Depends on:** T-0.26, T-1.3, T-1.4
+
 ### [ ] T-1.12 Engine test coverage for M1
 - **Do:** Complete `TileEngineTests` with fakes for AX, geometry and Spaces for every M1 behaviour listed in TA-24 level 2.
 - **Traces:** TA-24
 - **Done when:** `swift test` passes and covers each M1 story with at least one test.
-- **Depends on:** T-1.1 to T-1.11
+- **Depends on:** T-1.1 to T-1.11, T-1.14
 
 ### [ ] T-1.13 [owner] M1 acceptance
 - **Do:** Go through the M1 checklist on both displays, with several Spaces.
-- **Traces:** US-5 to US-12, US-23, US-29, US-30
+- **Traces:** US-5 to US-12, US-23, US-29, US-30, US-31
 - **Done when:** all M1 items are ticked, or the failures are written down with a decision.
 - **Depends on:** T-1.12
 
@@ -422,6 +434,7 @@ To be copied into `specs/review.md` when a milestone is reviewed. Run on both di
 - [ ] "Tile now" arranges equal columns on each display without moving windows between displays (US-4.1, US-4.2).
 - [ ] After "Tile now", no two tiled windows overlap and the gap is even (US-4.3, L7).
 - [ ] Floating and full-screen windows are not moved (US-4.5).
+- [ ] With more windows than the limit, "Tile now" tiles the most recent ones and minimises the rest; the limit can be changed per display and is remembered (US-31.1 to US-31.3).
 
 ### M1
 - [ ] A fresh install starts paused, and nothing moves until "Resume tiling" (US-23.5).
@@ -438,6 +451,7 @@ To be copied into `specs/review.md` when a milestone is reviewed. Run on both di
 - [ ] It works with 16 Spaces and with "Displays have separate Spaces" on and off (US-12.5, US-12.6).
 - [ ] A window moved to another Space with Mission Control or drag plus Ctrl+arrow leaves the old layout and joins the new one (US-29).
 - [ ] Full screen in and out returns the window to its place without changing other Spaces (US-30).
+- [ ] A window minimised to make room swaps in when brought back; a new window on a full layout takes a tile; freed tiles are refilled; user-minimised windows are never brought back (US-31.4 to US-31.8).
 
 ### M2
 - [ ] Title-bar drags are recognised, and content drags, clicks and double-clicks are not (US-13).
@@ -503,6 +517,9 @@ Every requirement maps to at least one task.
 | US-28 Resize by dragging an edge | T-0.7, T-2.6, T-2.7 |
 | US-29 Move a window to another Space | T-1.6 |
 | US-30 Full-screen windows | T-1.7 |
+| US-31 Window limit per display | T-0.26, T-1.14 |
+| TA-27 Window limit and recency | T-0.26, T-1.14 |
+| UX-17 Window limit | T-0.26 |
 | TA-1, TA-2 Platform and packaging | T-0.1 |
 | TA-3 to TA-6 Core | T-0.3 to T-0.6 |
 | TA-7 Geometry | T-0.8 |

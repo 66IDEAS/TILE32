@@ -2,7 +2,7 @@
 
 Status: draft for review
 Date: 2026-10-11, revised 2026-10-18
-Inputs: `specs/specifications.md` (US-1..US-30, layout rules L1-L8, N-1..N-12, C-1..C-10), `specs/constitution.md`
+Inputs: `specs/specifications.md` (US-1..US-31, layout rules L1-L9, N-1..N-12, C-1..C-10), `specs/constitution.md`
 Reference prototype for the layout logic: `prototype/index.html` (functions `norm`, `without`, `repl`, `swapIds`, `layoutTree`, `zoneOf`, `applyDrop`)
 
 Each entry has a number (TA-n), a title, a description, and a "Serves" line that lists the user stories (US), layout rules (L), non-functional requirements (N) and constraints (C) it supports. Section 9 maps every user story back to the entries.
@@ -115,6 +115,7 @@ The engine keeps `[LayoutKey: LayoutTree]`. Only the trees whose Space is curren
 | `snap: true` on `resizing`, with `snappedRatio(_:)` | Moves the boundary to the nearest of 1/4, 1/3, 1/2, 2/3, 3/4 of its split when within 0.01, measured on the cumulative position of the boundary. Used on release, not while dragging | new | L8, US-28.5 |
 | `dropping(_:on:zone:)` | Dispatches a drop: `swapping` for the centre zone, `splitting` for an edge zone | `applyDrop` | L6 |
 | `equalized()` | Sets every weight in every split to `1 / n` without changing the structure | new | US-28.9 |
+| `replacing(_ old:, with new:)` | Puts a window in the place of another one; the arrangement and the weights stay the same | new | L9, US-31 |
 
 Edge cases that must be covered by tests: dragging the only window, dropping a window on itself (no-op), a target that is not in the tree (no-op), a tree that shrinks to one leaf, weights that drift through many operations (they must always sum to 1 within 1e-9), resizing at the minimum, resizing an outer edge, and dropping onto a window of a different display or Space (handled by the engine as remove from tree A plus insert into tree B, see TA-14).
 
@@ -293,7 +294,7 @@ Native full-screen windows are detected through `AXFullScreen` and through the S
 
 ### TA-19 Persistence
 
-**Description:** Persistence uses `UserDefaults` only. Stored values: the list of excluded bundle identifiers, the paused flag (default `true`, so a fresh install starts paused as US-23.5 requires), and (optional, last) the serialised layouts (US-26). The start-at-login state is not stored by the app, it is read from `SMAppService`. Nothing else is written, and the app writes no other files. Layouts, if implemented, are stored as JSON per Space and display, including the weights, with window descriptors (TA-20), and are dropped on any parse error. The Space part of the key is the Space's UUID (TA-26), because the numeric Space id can change after a logout.
+**Description:** Persistence uses `UserDefaults` only. Stored values: the list of excluded bundle identifiers, the window limit per display (TA-27), the paused flag (default `true`, so a fresh install starts paused as US-23.5 requires), and (optional, last) the serialised layouts (US-26). The start-at-login state is not stored by the app, it is read from `SMAppService`. Nothing else is written, and the app writes no other files. Layouts, if implemented, are stored as JSON per Space and display, including the weights, with window descriptors (TA-20), and are dropped on any parse error. The Space part of the key is the Space's UUID (TA-26), because the numeric Space id can change after a logout.
 
 **Serves:** US-22.4, US-23.3, US-25, US-26, N-4
 
@@ -405,6 +406,19 @@ Rules for their use:
 Notarization is not affected: it checks the signature, the hardened runtime and malware, not which functions are called (N-11). AltTab, Amethyst and Hammerspoon use the same functions in notarized releases.
 
 **Serves:** US-12, US-29, US-30, C-5, C-9, N-11
+
+### TA-27 Window limit and recency
+
+**Description:** Rule L9 and US-31 need two things the engine did not have: a limit per display and an order of use.
+
+- **Limits:** `[DisplayID: Int]` in `UserDefaults`, range 2 to 16. Default: 12 for displays at least 3840 points wide, 6 for smaller ones.
+- **Recency:** the engine keeps the windows in order of last use. It starts from the window server's front-to-back order of the on-screen windows (`WindowServerList`, public), and moves a window to the front whenever it becomes focused (`kAXFocusedWindowChangedNotification` and `NSWorkspace.didActivateApplicationNotification`, from M1). No extra permission is needed.
+- **Choosing tiles:** when a layout would exceed its limit, the most recent windows up to the limit are tiled, and the others are minimised through `kAXMinimizedAttribute`. The engine remembers them in `minimisedByEngine`, so it never touches windows the user minimised (US-31.8). Its own minimise and restore writes are suppressed like frame writes (TA-12).
+- **Swapping in:** when a window in `minimisedByEngine` comes back, or a new window opens on a full layout, the engine replaces the least recently used leaf with the returning window (`replacing(_:with:)` in `TileCore`, which keeps the arrangement and the weights) and minimises the window it replaced.
+- **Freed tiles:** when a tile is freed, the most recent window in `minimisedByEngine` for that layout returns through `appending` (US-31.6).
+- **Untile:** windows in `minimisedByEngine` are restored and then get their original frames (US-24.8).
+
+**Serves:** L9, US-31, US-3.5, US-24.8
 
 ---
 
@@ -571,3 +585,4 @@ The layout logic is ported from the project's own prototype. If code or techniqu
 | US-28 Resize by dragging an edge | TA-3, TA-4, TA-5, TA-14, TA-15, TA-25 |
 | US-29 Move a window to another Space | TA-16, TA-20, TA-26 |
 | US-30 Full-screen windows | TA-9, TA-10, TA-16, TA-26 |
+| US-31 Window limit per display | TA-4, TA-19, TA-27 |

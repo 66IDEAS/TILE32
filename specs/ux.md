@@ -2,7 +2,7 @@
 
 Status: draft for review
 Date: 2026-10-11, revised 2026-10-18
-Inputs: `specs/specifications.md` (US-1..US-30), `specs/architecture.md` (TA-15 overlay, TA-17 menu-bar layer, TA-25 resizing), prototype `prototype/index.html` (look of the drop preview)
+Inputs: `specs/specifications.md` (US-1..US-31), `specs/architecture.md` (TA-15 overlay, TA-17 menu-bar layer, TA-25 resizing), prototype `prototype/index.html` (look of the drop preview)
 
 TILE32 is a small utility with almost no interface. There is no main window and no Dock icon. The whole UI is: the menu-bar icon, its menu, the drop-zone overlay shown while dragging, one first-run explanation, and the look of the tiled windows. Each entry below has a number (UX-n), a title, a description, and a "Serves" line with the user stories (US) it supports.
 
@@ -53,6 +53,7 @@ Details:
 +-----------------------------------------------+
 | Don't tile Safari                             |
 | Excluded apps                               > |
+| Window limit                                > |
 +-----------------------------------------------+
 | Pause tiling                                  |
 | Untile                                        |
@@ -84,6 +85,7 @@ Details:
 +-----------------------------------------------+
 | Don't tile Safari                             |
 | Excluded apps                               > |
+| Window limit                                > |
 +-----------------------------------------------+
 | Resume tiling                                 |
 | Untile                                        |
@@ -117,6 +119,7 @@ Details:
 +-----------------------------------------------+
 | Don't tile an app                 (grey)      |
 | Excluded apps                     (grey)      |
+| Window limit                      (grey)      |
 +-----------------------------------------------+
 | Pause tiling                      (grey)      |
 | Untile                            (grey)      |
@@ -210,6 +213,7 @@ Choosing "Open Accessibility settings..." opens the Accessibility pane of System
 | Active, no problems | "Tiling 5 windows on 2 displays" (singular: "Tiling 1 window on 1 display") |
 | Active, nothing to tile | "No windows to arrange" |
 | Active, some do not fit | "Tiling 5 windows - 1 does not fit" |
+| Active, some minimised to make room | "Tiling 18 windows on 2 displays - 15 minimised to make room" |
 | Paused, never resumed yet (first run) | "Tiling paused - choose Resume tiling to start" |
 | Paused by the user | "Tiling paused" |
 | After Untile | "Windows restored - tiling paused" |
@@ -330,6 +334,9 @@ A status line text stays until the state changes. It is not timed, so there is n
 | Quit TILE32 | Menu item |
 | Dump layout trees, Copy diagnostics | Debug builds only |
 | (does not fit) | Suffix in the "Windows" submenu |
+| (minimised to make room) | Suffix in the "Windows" submenu |
+| Window limit | Menu item (submenu) |
+| Tiling 18 windows on 2 displays - 15 minimised to make room | Status line |
 | Floating | Header in the "Windows" submenu |
 | (floating: dialog), (floating: panel), (floating: excluded app), (floating: full screen), (floating: too small), (floating: not resizable) | Suffixes in the "Windows" submenu |
 | Swap places | Overlay label |
@@ -371,6 +378,28 @@ A status line text stays until the state changes. It is not timed, so there is n
 ```
 
 **Serves:** US-28, L8
+
+### UX-17 Window limit
+
+**Description:** A "Window limit" submenu sits below "Excluded apps". It has one group per display, with the display name as a section header and the numbers 2 to 16 as choices; the current limit has a check mark. Choosing a number takes effect at once (US-31.7).
+
+```
++-----------------------------------------------+
+| Dell U4924DW                                  |   header
+|   2  3  4  ...  11                            |
+|   12                                       ✓  |
+|   13  ...  16                                 |
+| Built-in Retina Display                       |   header
+|   6                                        ✓  |
+|   ...                                         |
++-----------------------------------------------+
+```
+
+- In the "Windows" submenu, windows that TILE32 minimised because of the limit appear under their display with "(minimised to make room)". Choosing one swaps it in (US-31.4).
+- The status line counts them: "Tiling 18 windows on 2 displays - 15 minimised to make room".
+- Nothing else is shown when a window is swapped: the usual macOS minimise and restore animations are the only feedback.
+
+**Serves:** US-31, US-3.5
 
 ---
 
@@ -423,5 +452,6 @@ Numbered UQ-n to keep them apart from the specification's Q-n and the architectu
 | US-25 Start at login | UX-3 |
 | US-27 Permission revoked or lost | UX-2, UX-5, UX-9 |
 | US-28 Resize by dragging an edge | UX-6, UX-13, UX-16 |
+| US-31 Window limit per display | UX-6, UX-9, UX-17 |
 
 Stories that have no visible interface of their own (US-7, US-8, US-9, US-11, US-26, US-29, US-30) are not listed: their behaviour shows only through the layout itself.
