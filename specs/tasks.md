@@ -265,12 +265,12 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.5, T-1.4
 - **Progress:** full screen leaves with a return hint and comes back (test); a shown full-screen Space has no layout and is never touched.
 
-### [~] T-1.8 Fallback mode without Space information
+### [x] T-1.8 Fallback mode without Space information
 - **Do:** When `SpaceService.isAvailable` is false, use the public on-screen window list, keep one tree per display, never write to windows that are not on screen, and show "Spaces not detected - only visible windows are arranged".
 - **Traces:** US-12.7, TA-16, UX-9
 - **Done when:** with the fake service set to unavailable, engine tests pass and the status line shows the fallback text; on the real machine a debug switch forces fallback mode without errors.
 - **Depends on:** T-1.5
-- **Result:** reconcile uses an unknown Space when the Space functions are missing (engine test), the status line says "Spaces not detected - only visible windows are arranged". Open: a debug switch to force fallback mode on the real machine.
+- **Result:** reconcile uses an unknown Space when the Space functions are missing (engine test), the status line says "Spaces not detected - only visible windows are arranged". Debug switch `--force-fallback` (with `--auto-fakewindows`): checked on 2026-10-18 on the real machine without Space functions; open, join and close worked with window ids from the Accessibility fallback. Done.
 
 ### [~] T-1.9 Displays connected and disconnected
 - **Do:** On a display change, give a new display empty trees, move a removed display's windows to the remaining display with `appending`, and bring any window outside all displays into view.

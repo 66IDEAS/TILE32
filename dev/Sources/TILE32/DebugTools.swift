@@ -165,8 +165,11 @@ extension AppDelegate {
         if arguments.contains("--hidden-space-write-test") { return run { await self.hiddenSpaceWriteTest() } }
         // Automatic tiling of FakeWindows windows only, for M1 checks: runs until --quit-after.
         if arguments.contains("--auto-fakewindows") {
+            // `--force-fallback` acts as if the Space functions were missing (US-12.7, T-1.8).
+            let service: SpaceService = arguments.contains("--force-fallback")
+                ? FakeSpaceService(isAvailable: false) : SkyLightSpaceService.shared
             let coordinator = TilingCoordinator(
-                engine: engine, spaceService: SkyLightSpaceService.shared, initialState: .running,
+                engine: engine, spaceService: service, initialState: .running,
                 displays: { [weak self] in self?.displayTable ?? DisplayTable(screens: []) },
                 limits: { [weak self] in self?.testLimits() ?? WindowLimits() },
                 onlyBundleIDs: [Self.fakeWindowsID], onChange: {}
