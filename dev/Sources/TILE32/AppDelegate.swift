@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The windows behind the last "Windows" submenu, so a choice can raise the right one.
     private var listedWindows: [WindowID: WindowSnapshot] = [:]
     private var refreshingMenu = false
+    private let engine = LayoutEngine()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -38,6 +39,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--frame-test-fakewindows") {
             Task {
                 await frameWriteTest(onlyBundleID: "com.66ideas.tile32.FakeWindows")
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        // `--tile-now-fakewindows` runs "Tile now" on FakeWindows windows only (task T-0.24),
+        // so the engine can be checked on the real screen without moving the owner's windows.
+        if CommandLine.arguments.contains("--tile-now-fakewindows") {
+            Task {
+                await tileNow(onlyBundleID: "com.66ideas.tile32.FakeWindows")
                 NSApp.terminate(nil)
             }
             return
@@ -147,6 +157,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard AccessibilityPermission.isGranted else { return }
         let displays = self.displays?.table ?? DisplayTable(screens: [])
         await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
+    }
+
+    /// "Tile now" (US-4). For the owner's windows it stays switched off until the owner agrees
+    /// and open question Q-3 is decided (task T-0.24).
+    private func tileNow(onlyBundleID: String?) async {
+        guard AccessibilityPermission.isGranted else { return }
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        let apps = AppInfo.runningRegularApps().filter { onlyBundleID == nil || $0.bundleID == onlyBundleID }
+        let service = SkyLightSpaceService.shared
+        let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: service)
+        _ = await engine.tileNow(records: Array(scan.registry.records.values), displays: displays,
+                                 currentSpaces: service.currentSpaces(on: displays))
     }
 
     private func runFrameWriteTest(onlyBundleID: String?) {

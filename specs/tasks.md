@@ -180,10 +180,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Progress:** `WindowMenuModel` (pure, 5 tests) and `WindowMenuLoader` in `TileEngine`; the submenu is refreshed every time the menu opens and updates in place while open; section headers use macOS section headers (also read by VoiceOver); choosing an entry raises the window and activates its app. Minimised windows are not listed (US-8.3). Waiting for the owner to look at the submenu and choose an entry.
 - **Depends on:** T-0.15, T-0.13
 
-### [ ] T-0.24 Tile now (first engine)
+### [~] T-0.24 Tile now (first engine)
 - **Do:** Create the `LayoutEngine` actor with trees keyed by `LayoutKey` (Space and display). "Tile now" builds `flat` trees for the Spaces currently shown, ordered by each window's current left edge, computes frames, and writes them in one batch per app (size, position, size, then read back). Add the expected-frame suppression of TA-12.
 - **Traces:** US-4, US-5, TA-3, TA-11, TA-12, TA-17, UX-12
 - **Done when:** with the owner's agreement, "Tile now" arranges the windows of both displays as equal columns with a 6 point gap, no window moves to another display, floating and full-screen windows stay put, and no second layout pass is logged.
+- **Progress:** `LayoutEngine` actor with trees per `LayoutKey` (Space and display), "Tile now" building `flat` trees ordered by left edge inside each usable area, batched writes per app through the `FrameWriting` protocol (`AXFrameWriter` for real windows), "does not fit" marking, and the expected-frame record of TA-12 with `isSelfCaused`. 6 engine tests with a fake writer. Real check on 2026-10-18 with `--tile-now-fakewindows` (FakeWindows only): 6 windows became 6 columns on the Dell, 846 to 847 points wide, exactly 6 points apart, the non-resizable control window untouched. Open: the menu item stays grey for the owner's windows until (1) session B (T-0.20) has run, (2) the owner agrees to a moment, and (3) open question Q-3 is decided, because the current desktop holds 27 windows that would be tiled.
 - **Depends on:** T-0.5, T-0.15, T-0.20
 
 ### [ ] T-0.25 [owner] M0 acceptance
