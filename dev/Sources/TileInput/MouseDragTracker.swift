@@ -24,7 +24,12 @@ public final class MouseDragTracker {
     public var onDragEnd: (@MainActor (CGWindowID, CGPoint, Bool) -> Void)?
     /// A gesture ended without a release to act on (Escape pressed, desktop switch).
     public var onCancel: (@MainActor () -> Void)?
+    /// An edge or corner resize moved or ended: window number, current frame, active edges
+    /// (US-28, TA-25). `final` is true on release.
+    public var onResize: (@MainActor (CGWindowID, CGRect, Set<DragStateMachine.Edge>, Bool) -> Void)?
     private var lastRead = ContinuousClock.now
+    /// All windows under the press; the one whose frame changes first is the real target.
+    private var candidates: [DragStateMachine.Press] = []
     private var drags = 0
 
     /// Reads per second while the button is held.
@@ -87,6 +92,8 @@ public final class MouseDragTracker {
         case .leftMouseDown:
             let point = cursor()
             let ownPID = ProcessInfo.processInfo.processIdentifier
+            candidates = WindowServerList.windows(at: point, margin: DragStateMachine.edgeMargin, excludingPID: ownPID)
+                .prefix(3).map { DragStateMachine.Press(window: $0.number, pid: $0.ownerPID, frame: $0.bounds, point: point) }
             let hit = WindowServerList.window(at: point, margin: DragStateMachine.edgeMargin, excludingPID: ownPID)
             if let hit {
                 Log.drag.debug("S1 press on w\(hit.number) \(hit.ownerName, privacy: .public) at \(Int(point.x)),\(Int(point.y))")
@@ -111,11 +118,28 @@ public final class MouseDragTracker {
                hypot(point.x - press.point.x, point.y - press.point.y) < DragStateMachine.travelThreshold {
                 return
             }
+            if case .pressed(let press) = state, candidates.count > 1 {
+                // Near a gap: follow whichever candidate actually changes (move or resize).
+                for candidate in candidates where candidate.window != press.window {
+                    if let window = WindowServerList.window(number: candidate.window),
+                       DragStateMachine.changedEdges(from: candidate.frame, to: window.bounds).isEmpty == false,
+                       let current = WindowServerList.window(number: press.window),
+                       DragStateMachine.changedEdges(from: press.frame, to: current.bounds).isEmpty {
+                        state = .pressed(candidate)
+                        Log.drag.debug("S1 press belongs to w\(candidate.window)")
+                        apply(.frameRead(window.bounds, cursor: point))
+                        return
+                    }
+                }
+            }
             if let window = WindowServerList.window(number: number) {
                 apply(.frameRead(window.bounds, cursor: point))
             }
             if case .dragging(let press, false) = state {
                 onDragMove?(press.window, point)
+            }
+            if case .resizing(let press, let edges) = state, let window = WindowServerList.window(number: press.window) {
+                onResize?(press.window, window.bounds, edges, false)
             }
         case .leftMouseUp:
             let point = cursor()
@@ -139,6 +163,10 @@ public final class MouseDragTracker {
             onDragEnd?(press.window, point, false)
         case (.dragging(let press, true), .release(let point), _):
             onDragEnd?(press.window, point, true)
+        case (.resizing(let press, _), _, .endedResize(let edges)):
+            if let window = WindowServerList.window(number: press.window) {
+                onResize?(press.window, window.bounds, edges, true)
+            }
         case (_, _, .cancelledDrag):
             onCancel?()
         case (.dragging, .reset, _):

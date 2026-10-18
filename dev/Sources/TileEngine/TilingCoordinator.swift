@@ -244,6 +244,23 @@ public final class TilingCoordinator {
         onChange()
     }
 
+    /// An edge resize moved or ended (US-28, TA-25). Returns the window's share for the label.
+    public func resized(_ number: CGWindowID, to frame: CGRect, edges: Set<Edge>, final: Bool) async -> Double? {
+        guard state == .running, let observation = lastObservation else { return nil }
+        if final {
+            while running { try? await Task.sleep(for: .milliseconds(20)) }
+            running = true
+        }
+        defer { if final { running = false } }
+        let snapshots = Dictionary(observation.records.map { ($0.id, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+        let table = displays()
+        let share = await engine.resize(WindowID(UInt64(number)), to: frame, edges: edges, final: final, displays: table,
+                                        currentSpaces: spaceService.currentSpaces(on: table), snapshots: snapshots)
+        lastWrite = .now
+        if final { onChange() }
+        return share
+    }
+
     /// "Tile now" while running: arranges afresh and keeps tiling (US-4.6).
     public func tileNow() async -> ReconcileSummary {
         let summary = await engine.reconcile(await observe(), limits: limits(), rebuild: true)

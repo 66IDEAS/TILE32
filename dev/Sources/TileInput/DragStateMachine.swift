@@ -144,7 +144,7 @@ public enum DragStateMachine {
         return ratio <= 1.5 ? .lockstep : .unrelated
     }
 
-    static func changedEdges(from a: CGRect, to b: CGRect) -> Set<Edge> {
+    public static func changedEdges(from a: CGRect, to b: CGRect) -> Set<Edge> {
         var edges: Set<Edge> = []
         if abs(a.minX - b.minX) > frameTolerance { edges.insert(.left) }
         if abs(a.maxX - b.maxX) > frameTolerance { edges.insert(.right) }

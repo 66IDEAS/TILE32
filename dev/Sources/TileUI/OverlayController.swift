@@ -42,6 +42,13 @@ public final class OverlayController {
         shownOn = display.id
     }
 
+    /// Only the label pill, centred in `area`, without a highlight: the share while resizing (UX-16).
+    public func showLabel(_ label: String, centredIn area: CGRect, on display: Display, table: DisplayTable) {
+        show(area: area, label: label, on: display, table: table)
+        (panels[display.id]?.contentView as? OverlayView)?.labelOnly = true
+        panels[display.id]?.contentView?.needsDisplay = true
+    }
+
     public func hide() {
         if let shownOn { panels[shownOn]?.orderOut(nil) }
         shownOn = nil
@@ -71,9 +78,13 @@ final class OverlayView: NSView {
     static let inset: CGFloat = 3
     static let cornerRadius: CGFloat = 10
 
+    /// True while resizing: only the percentage pill is drawn (UX-16).
+    var labelOnly = false
+
     func update(area: CGRect, label: String) {
         self.area = area
         self.label = label
+        labelOnly = false
         needsDisplay = true
     }
 
@@ -83,6 +94,10 @@ final class OverlayView: NSView {
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let accent = NSColor.controlAccentColor
         let box = area.insetBy(dx: Self.inset, dy: Self.inset)
+        if labelOnly {
+            drawLabel(in: box, color: highContrast ? .labelColor : accent)
+            return
+        }
         let path = NSBezierPath(roundedRect: box, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
         accent.withAlphaComponent(dark ? 0.25 : 0.18).setFill()
         path.fill()

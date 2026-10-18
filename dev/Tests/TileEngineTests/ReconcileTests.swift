@@ -520,3 +520,57 @@ private func shape(_ tree: LayoutTree) -> String {
     }
     return walk(root)
 }
+
+@Suite("Resizing by edge (M2, US-28)")
+struct ResizeTests {
+    @Test func ownerScenarioFiftyTwentyFiveTwentyFive() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(3, x: 3000)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        // Drag A's right edge to the middle of the display, then B's right edge to three quarters.
+        var a = world.window(1)!.frame
+        a.size.width = 2560 - 3 - a.minX
+        world.update(1) { $0.frame = a }
+        let share = await engine.resize(WindowID(1), to: a, edges: [.right], final: true, displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(abs((share ?? 0) - 0.5) < 0.01)
+        var b = world.window(2)!.frame
+        b.size.width = 3840 - 3 - b.minX + 2   // released 2 points off: snaps to 3/4
+        world.update(2) { $0.frame = b }
+        _ = await engine.resize(WindowID(2), to: b, edges: [.right], final: true, displays: bothDisplays,
+                                currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let widths = [1, 2, 3].map { world.window(UInt64($0))!.frame.width }
+        #expect(abs(widths[0] - 2 * widths[1]) < 8)
+        #expect(abs(widths[1] - widths[2]) < 4)
+    }
+
+    @Test func liveResizeWritesOnlyTheNeighbours() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        var a = world.window(1)!.frame
+        a.size.width += 400
+        world.update(1) { $0.frame = a }
+        let before = world.window(2)!.frame
+        _ = await engine.resize(WindowID(1), to: a, edges: [.right], final: false, displays: bothDisplays,
+                                currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(world.window(1)!.frame == a)                  // the held window is not touched
+        #expect(world.window(2)!.frame.minX > before.minX)     // the neighbour followed
+    }
+
+    @Test func outerEdgeSnapsBack() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        let tile = world.window(1)!.frame
+        var dragged = tile
+        dragged.origin.x += 200; dragged.size.width -= 200   // left edge, which touches the display border
+        world.update(1) { $0.frame = dragged }
+        _ = await engine.resize(WindowID(1), to: dragged, edges: [.left], final: true, displays: bothDisplays,
+                                currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(world.window(1)!.frame == tile)
+    }
+}

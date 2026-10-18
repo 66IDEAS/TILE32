@@ -50,7 +50,7 @@ public enum DropZone: Sendable, Equatable, CaseIterable {
 }
 
 /// A window edge, used for resizing (rule L8).
-public enum Edge: Sendable, Equatable, CaseIterable {
+public enum Edge: String, Sendable, Equatable, CaseIterable {
     case left, right, top, bottom
 
     var axis: SplitDirection { self == .left || self == .right ? .horizontal : .vertical }

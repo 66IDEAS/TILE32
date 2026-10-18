@@ -128,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             tracker.onDragMove = { [weak self] number, point in self?.dragMoved(number, point) }
             tracker.onDragEnd = { [weak self] number, point, cancelled in self?.dragEnded(number, point, cancelled) }
             tracker.onCancel = { [weak self] in self?.overlay.hide() }
+            tracker.onResize = { [weak self] number, frame, edges, final in self?.resized(number, frame, edges, final) }
             dragTracker = tracker
         }
         dragTracker?.start()
@@ -140,6 +141,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let preview = await coordinator.dragMoved(number, at: point),
                let display = table.display(id: preview.key.display) {
                 overlay.show(area: preview.area, label: OverlayController.label(for: preview.target), on: display, table: table)
+            } else {
+                overlay.hide()
+            }
+        }
+    }
+
+    /// Live neighbours and the share label while resizing; snap and write on release (US-28).
+    private func resized(_ number: CGWindowID, _ frame: CGRect, _ edges: Set<DragStateMachine.Edge>, _ final: Bool) {
+        guard let coordinator else { return }
+        let coreEdges = Set(edges.compactMap { Edge(rawValue: $0.rawValue) })
+        Task {
+            let share = await coordinator.resized(number, to: frame, edges: coreEdges, final: final)
+            let table = displayTable
+            if !final, let share, let display = table.display(mostlyContaining: frame) {
+                let percent = Int((share * 100).rounded())
+                overlay.showLabel("\(percent)%", centredIn: frame, on: display, table: table)
             } else {
                 overlay.hide()
             }

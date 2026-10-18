@@ -48,6 +48,16 @@ public enum WindowServerList {
         return list.compactMap(parse).filter { $0.layer == 0 }.map(\.number)
     }
 
+    /// Every normal window under a point, frontmost first. Near a gap both neighbours are
+    /// candidates, because both have their resize zone there (found in the M2 resize check).
+    public static func windows(at point: CGPoint, margin: CGFloat, excludingPID: pid_t? = nil) -> [ServerWindow] {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
+        return list.compactMap(parse).filter { window in
+            window.layer == 0 && window.ownerPID != excludingPID && window.bounds.insetBy(dx: -margin, dy: -margin).contains(point)
+        }
+    }
+
     /// The current bounds of one window, or nil when it is gone.
     public static func window(number: CGWindowID) -> ServerWindow? {
         guard let list = CGWindowListCopyWindowInfo([.optionIncludingWindow], number) as? [[String: Any]] else { return nil }
