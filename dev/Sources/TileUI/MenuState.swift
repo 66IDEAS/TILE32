@@ -48,17 +48,23 @@ public struct MenuActions {
     public var tileNow: @MainActor () -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
+    public var logSpaces: @MainActor () -> Void
+    public var logWindows: @MainActor () -> Void
     public var diagnostics: @MainActor () -> String
 
     public init(
         tileNow: @escaping @MainActor () -> Void,
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
+        logSpaces: @escaping @MainActor () -> Void = {},
+        logWindows: @escaping @MainActor () -> Void = {},
         diagnostics: @escaping @MainActor () -> String
     ) {
         self.tileNow = tileNow
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
+        self.logSpaces = logSpaces
+        self.logWindows = logWindows
         self.diagnostics = diagnostics
     }
 }

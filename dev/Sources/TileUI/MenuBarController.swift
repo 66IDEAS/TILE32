@@ -91,6 +91,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         let item = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
         submenu.addItem(ActionMenuItem(title: "Dump layout trees") { [actions] in actions.dumpLayoutTrees() })
+        submenu.addItem(ActionMenuItem(title: "Log Spaces") { [actions] in actions.logSpaces() })
+        submenu.addItem(ActionMenuItem(title: "Log windows") { [actions] in actions.logWindows() })
         submenu.addItem(ActionMenuItem(title: "Copy diagnostics") { [actions] in
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(actions.diagnostics(), forType: .string)

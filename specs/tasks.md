@@ -134,10 +134,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** built with AppKit (simpler than SwiftUI for these window types). Twelve cases: normal, minimum size, delayed, five at once, splash, dialog, sheet, tool panel, save panel, resizes itself, full screen, hang. Every case can also be started from the command line (`--open`, `--hang-after`, `--hang-seconds`, `--quit-after`); scripted runs stay in the background and never take the keyboard focus. Used for the hung-app check of T-0.14. Done 2026-10-18.
 - **Depends on:** T-0.2
 
-### [ ] T-0.17 Spike tools for Spaces and window listing (S6, S3)
+### [x] T-0.17 Spike tools for Spaces and window listing (S6, S3)
 - **Do:** Add the debug items "Log Spaces" (the display-to-Space table, each Space's type and UUID, and the Space of every window) and "Log windows" (AX windows per app, including those on hidden Spaces, plus the public on-screen list for the fallback). Log automatically on every Space change.
 - **Traces:** S6, S3, TA-16, TA-26
 - **Done when:** both items produce readable output for the current setup.
+- **Result:** "Log Spaces" and "Log windows" in the Debug submenu, an automatic full log on every Space switch in debug builds, `--dump-spaces` for scripted runs, and `WindowServerList` (public window list, also the base of the fallback mode). First run recorded in `specs/spikes.md`. Done 2026-10-18.
 - **Depends on:** T-0.13, T-0.14
 
 ### [ ] T-0.18 [owner] Spike session A: Spaces (S6, S3)

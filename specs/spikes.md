@@ -51,3 +51,15 @@ The owner's current desktop holds **27 windows that would be tiled**, spread ove
 - A sheet is not listed as a window of its own; it belongs to its parent window, as TA-10 assumed.
 - A save panel opened by `NSSavePanel.begin` did not appear in the window list during the reading. To check again in T-3.1.
 - A frozen app is now given up after 0.5 to 1.5 seconds (task T-0.14).
+
+## S3 and S6 - reading with the spike tools (2026-10-18, before session A)
+
+First run of "Log Spaces" and "Log windows" (task T-0.17), on the current desktop only, without switching:
+
+- **Space table:** one shared entry ("Main"), 7 desktops, no full-screen Space at the time. Both displays show Space 4 (desktop 2).
+- **Window server:** 465 normal (layer 0) windows of regular apps in total, 36 on screen. 398 of them report no Space at all: windows that are not ordered in (hidden helpers, cached windows). Per Space: 43 on Space 4 (current), 10 on Space 5, 2 on Space 7, 4 on Space 8, 7 on Space 9, and 1 window on all seven Spaces.
+- **Accessibility lists only the current Space:** 37 windows, all on Space 4 except one minimised window (Space 8). None of the windows on Spaces 5, 7, 8 and 9 was listed. This confirms the observation of T-0.14 on a larger sample.
+- **Window server windows on the current Space that Accessibility does not list:** 10, all small or off screen (toolbars 20 points high, popups, small helper windows). None of them is a candidate for tiling.
+- One app did not answer within the timeout.
+
+**Consequence for the design (to confirm in session A, then update TA-16 and TA-20):** TILE32 learns about windows on hidden Spaces only through the window server list (number, owner, Space) and reads their Accessibility element when their Space is shown. Dormant trees therefore hold window numbers, which are stable while a window lives, and get matched to Accessibility elements on return. This fits the existing rule that TILE32 never writes to hidden Spaces.

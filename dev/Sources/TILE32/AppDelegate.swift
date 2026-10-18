@@ -27,6 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             runDumpAndQuit()
             return
         }
+        if CommandLine.arguments.contains("--dump-spaces") {
+            Task {
+                logSpaceDiagnostics(windows: false)
+                await logSpaceWindows()
+                NSApp.terminate(nil)
+            }
+            return
+        }
         #endif
         startSpaceMonitor()
         let permission = PermissionMonitor { [weak self] granted in self?.permissionChanged(granted) }
@@ -42,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     AccessibilityPermission.openSettings()
                 },
                 dumpLayoutTrees: { [weak self] in self?.dumpWindows() },
+                logSpaces: { [weak self] in self?.logSpaceDiagnostics(windows: false) },
+                logWindows: { [weak self] in self?.logSpaceDiagnostics(windows: true) },
                 diagnostics: { [weak self] in self?.diagnostics() ?? "" }
             )
         )
@@ -66,6 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let monitor = SpaceMonitor(service: service, displays: { [weak self] in
             self?.displays?.table ?? DisplayTable(screens: [])
+        }, onChange: { [weak self] in
+            #if DEBUG
+            // Spike S6 and S3: record everything on every Space switch.
+            self?.logSpaceDiagnostics(windows: true)
+            #endif
         })
         monitor.logCurrentSpaces()
         spaces = monitor
@@ -98,6 +113,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     #endif
+
+    /// Spike tools for S6 and S3 (T-0.17).
+    private func logSpaceDiagnostics(windows: Bool) {
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        SpaceDiagnostics.logSpaces(service: SkyLightSpaceService.shared, displays: displays)
+        guard windows else { return }
+        Task { await logSpaceWindows() }
+    }
+
+    private func logSpaceWindows() async {
+        guard AccessibilityPermission.isGranted else { return }
+        let displays = self.displays?.table ?? DisplayTable(screens: [])
+        await SpaceDiagnostics.logWindows(apps: AppInfo.runningRegularApps(), service: SkyLightSpaceService.shared, displays: displays)
+    }
 
     private func permissionChanged(_ granted: Bool) {
         menuBar?.update(Self.menuState(permissionGranted: granted))
