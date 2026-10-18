@@ -1,6 +1,6 @@
 # TILE32 - Tasks
 
-Status: ready to start
+Status: M0 done (2026-10-18), M1 next
 Date: 2026-10-18
 Sources: `specs/specifications.md` (US-1..US-31, L1-L9, N-1..N-12, C-1..C-10), `specs/architecture.md` (TA-1..TA-26, spikes S1-S7), `specs/ux.md` (UX-1..UX-16), `specs/constitution.md`
 
@@ -178,18 +178,18 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Errors found:** fast title-bar drags were rejected as "not in lockstep", because windows trail the cursor by 40 to 50 percent during a flick (Slack, Chrome, Teams). Fixed in two steps: a tolerance that grows with the cursor travel, then direction and distance ratio. All recorded misses are unit tests now (16 state machine tests). Resolved 2026-10-18.
 - **Depends on:** T-0.21
 
-### [~] T-0.23 Windows submenu
+### [x] T-0.23 Windows submenu
 - **Do:** Fill the "Windows" submenu: headers "<display name> - Desktop <n>", entries "App - title" (cut in the middle at about 48 characters), a "Floating" group with reasons, "<n> windows on other Spaces", and "No windows to arrange". Choosing an entry brings the window to the front.
 - **Traces:** US-3, UX-6, UX-15
 - **Done when:** the submenu matches UX-6 for the current setup, and choosing an entry raises that window.
-- **Progress:** `WindowMenuModel` (pure, 5 tests) and `WindowMenuLoader` in `TileEngine`; the submenu is refreshed every time the menu opens and updates in place while open; section headers use macOS section headers (also read by VoiceOver); choosing an entry raises the window and activates its app. Minimised windows are not listed (US-8.3). Waiting for the owner to look at the submenu and choose an entry.
+- **Progress:** `WindowMenuModel` (pure, 5 tests) and `WindowMenuLoader` in `TileEngine`; the submenu is refreshed every time the menu opens and updates in place while open; section headers use macOS section headers (also read by VoiceOver); choosing an entry raises the window and activates its app. Minimised windows are not listed (US-8.3). Confirmed by the owner in the M0 acceptance on 2026-10-18. Done.
 - **Depends on:** T-0.15, T-0.13
 
-### [~] T-0.24 Tile now (first engine)
+### [x] T-0.24 Tile now (first engine)
 - **Do:** Create the `LayoutEngine` actor with trees keyed by `LayoutKey` (Space and display). "Tile now" builds `flat` trees for the Spaces currently shown, ordered by each window's current left edge, computes frames, and writes them in one batch per app (size, position, size, then read back). Add the expected-frame suppression of TA-12.
 - **Traces:** US-4, US-5, TA-3, TA-11, TA-12, TA-17, UX-12
 - **Done when:** with the owner's agreement, "Tile now" arranges the windows of both displays as equal columns with a 6 point gap, no window moves to another display, floating and full-screen windows stay put, and no second layout pass is logged.
-- **Progress:** `LayoutEngine` actor with trees per `LayoutKey` (Space and display), "Tile now" building `flat` trees ordered by left edge inside each usable area, batched writes per app through the `FrameWriting` protocol (`AXFrameWriter` for real windows), "does not fit" marking, and the expected-frame record of TA-12 with `isSelfCaused`. 6 engine tests with a fake writer. Real check on 2026-10-18 with `--tile-now-fakewindows` (FakeWindows only): 6 windows became 6 columns on the Dell, 846 to 847 points wide, exactly 6 points apart, the non-resizable control window untouched. Conditions (1) session B and (3) Q-3 are met (T-0.20, D-7, T-0.26), and Untile exists (T-3.3, built early), so "Tile now" is switched on in the menu since 2026-10-18; it only runs when the owner chooses it. The status line shows how many windows are tiled, minimised to make room, or do not fit. Open: the owner tries it once on the real desktop (condition 2).
+- **Progress:** `LayoutEngine` actor with trees per `LayoutKey` (Space and display), "Tile now" building `flat` trees ordered by left edge inside each usable area, batched writes per app through the `FrameWriting` protocol (`AXFrameWriter` for real windows), "does not fit" marking, and the expected-frame record of TA-12 with `isSelfCaused`. 6 engine tests with a fake writer. Real check on 2026-10-18 with `--tile-now-fakewindows` (FakeWindows only): 6 windows became 6 columns on the Dell, 846 to 847 points wide, exactly 6 points apart, the non-resizable control window untouched. Conditions (1) session B and (3) Q-3 are met (T-0.20, D-7, T-0.26), and Untile exists (T-3.3, built early), so "Tile now" is switched on in the menu since 2026-10-18; it only runs when the owner chooses it. The status line shows how many windows are tiled, minimised to make room, or do not fit. The owner tried it on the real desktop in the M0 acceptance; after decision D-8 (two rows) all windows fit. Done 2026-10-18.
 - **Depends on:** T-0.5, T-0.15, T-0.20
 
 ### [x] T-0.26 Window limit for Tile now
@@ -199,13 +199,14 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** `WindowLimits` and `WindowLimitStore` (defaults 12 and 6 by display width, 2 to 16, stored per display UUID), `LayoutTree.replacing`, `WindowServerList.frontToBack` as the starting order of use, "Tile now" with limit and order, minimising through `WindowActions.setMinimised`, `minimisedByEngine` in the engine, "Window limit" submenu, "(minimised to make room)" entries in the Windows submenu. 8 new tests (113 in total). Real check on 2026-10-18 with FakeWindows only and `--window-limit 4`: the four frontmost test windows were tiled, the other two minimised, the control window untouched. The status line count arrives with the running states in T-1.1. Done 2026-10-18.
 - **Depends on:** T-0.24
 
-### [~] T-0.25 [owner] M0 acceptance
+### [x] T-0.25 [owner] M0 acceptance
 - **Do:** Go through the M0 checklist at the end of this file on both displays.
 - **Traces:** US-1 to US-4
 - **Done when:** all M0 items are ticked, or the failures are written down with a decision.
 - **Depends on:** T-0.1 to T-0.24, T-0.26
 - **Progress:** first run on 2026-10-18. Windows submenu, Window limit and Untile fine.
-- **Errors found:** "Tile now" made 12 columns of about 420 points on the Dell; 6 of 12 windows could not shrink that far, overlapped their neighbours, and the icon showed the "does not fit" count 6. Decision D-8: two rows when columns would be narrower than 800 points (`LayoutTree.arranged`, 5 tests). To recheck with the owner.
+- **Errors found:** "Tile now" made 12 columns of about 420 points on the Dell; 6 of 12 windows could not shrink that far, overlapped their neighbours, and the icon showed the "does not fit" count 6. Decision D-8: two rows when columns would be narrower than 800 points (`LayoutTree.arranged`, 5 tests). Rechecked by the owner on 2026-10-18: two rows, no window that does not fit. Resolved.
+- **Result:** M0 accepted on 2026-10-18; the checklist is in `specs/review.md`.
 
 ---
 
@@ -431,19 +432,19 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 To be copied into `specs/review.md` when a milestone is reviewed. Run on both displays: the Dell U4924DW (5120x1440) and the built-in Color LCD (3456x2234).
 
 ### M0
-- [ ] Only a menu-bar icon appears after launch, with no Dock icon and no window (US-1.1).
-- [ ] The menu shows the status line, "Tile now", "Windows" and "Quit TILE32" (US-1.2).
-- [ ] "Quit TILE32" leaves the windows where they are (US-1.3).
-- [ ] Without the permission, the alert explains it in plain words and opens System Settings (US-2.1, UX-8).
-- [ ] Without the permission, the status line says so and "Tile now" is grey (US-2.2, UX-5).
-- [ ] Granting the permission takes effect without a restart (US-2.3).
-- [ ] Only the Accessibility permission is ever requested (US-2.5).
-- [ ] The Windows submenu lists the windows of the shown Spaces by display, with floating windows separate (US-3.1, US-3.2).
-- [ ] Choosing a window in the submenu brings it to the front (US-3.4).
-- [ ] "Tile now" arranges equal columns, or two rows when columns would be narrower than 800 points, without moving windows between displays (US-4.1, US-4.2, L2).
-- [ ] After "Tile now", no two tiled windows overlap and the gap is even (US-4.3, L7).
-- [ ] Floating and full-screen windows are not moved (US-4.5).
-- [ ] With more windows than the limit, "Tile now" tiles the most recent ones and minimises the rest; the limit can be changed per display and is remembered (US-31.1 to US-31.3).
+- [x] Only a menu-bar icon appears after launch, with no Dock icon and no window (US-1.1).
+- [x] The menu shows the status line, "Tile now", "Windows" and "Quit TILE32" (US-1.2).
+- [x] "Quit TILE32" leaves the windows where they are (US-1.3).
+- [x] Without the permission, the alert explains it in plain words and opens System Settings (US-2.1, UX-8).
+- [x] Without the permission, the status line says so and "Tile now" is grey (US-2.2, UX-5).
+- [x] Granting the permission takes effect without a restart (US-2.3).
+- [x] Only the Accessibility permission is ever requested (US-2.5).
+- [x] The Windows submenu lists the windows of the shown Spaces by display, with floating windows separate (US-3.1, US-3.2).
+- [x] Choosing a window in the submenu brings it to the front (US-3.4).
+- [x] "Tile now" arranges equal columns, or two rows when columns would be narrower than 800 points, without moving windows between displays (US-4.1, US-4.2, L2).
+- [x] After "Tile now", no two tiled windows overlap and the gap is even (US-4.3, L7).
+- [x] Floating and full-screen windows are not moved (US-4.5).
+- [x] With more windows than the limit, "Tile now" tiles the most recent ones and minimises the rest; the limit can be changed per display and is remembered (US-31.1 to US-31.3).
 
 ### M1
 - [ ] A fresh install starts paused, and nothing moves until "Resume tiling" (US-23.5).
