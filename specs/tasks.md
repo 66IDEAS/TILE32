@@ -442,11 +442,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Depends on:** T-2.2
 - **Progress:** the overlay announces each new label once to VoiceOver (UQ-2), the panel itself is hidden from VoiceOver; status item label, value and help, and real section headers in the submenus were built earlier. Contrast measured for all eight accent colours (`tmp/tools/accent-contrast.swift`): none passes 4.5:1 in light mode, all pass in dark mode; the label now picks the accent colour only when it passes (UQ-3 answered, UX-10 updated). Waiting for the owner to listen with VoiceOver once.
 
-### [ ] T-3.7 Text audit
+### [x] T-3.7 Text audit
 - **Do:** Compare every visible string in the app with the table in UX-15, and check sentence case, no exclamation marks and no em dashes.
 - **Traces:** UX-15, N-9, constitution writing rules
 - **Done when:** every string matches the table, and a search of the sources finds no em dash.
 - **Depends on:** T-3.1 to T-3.6
+- **Result:** every string of UX-15 is in the app with the same wording; no em dash in sources, tests or resources; no exclamation mark in a user-visible string; sentence case throughout ("Spaces" and "TILE32" are proper names). The table in UX-15 was updated for the three extra debug items and the fuller "does not fit" status line. Done 2026-10-18.
 
 ### [ ] T-3.8 [owner] Release build and notarization
 - **Do:** Complete `./build-app.sh release`: sign with "Developer ID Application: Alexander Ilg (AHBM4Y6VPX)" with secure timestamp and hardened runtime, submit with `xcrun notarytool submit --wait`, and staple. The owner stores the notarization credentials once with `notarytool store-credentials` (Claude never handles the password). Check that the notarized build still finds the four Space functions (carried over from S6).

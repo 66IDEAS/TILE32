@@ -212,7 +212,7 @@ Choosing "Open Accessibility settings..." opens the Accessibility pane of System
 |---|---|
 | Active, no problems | "Tiling 5 windows on 2 displays" (singular: "Tiling 1 window on 1 display") |
 | Active, nothing to tile | "No windows to arrange" |
-| Active, some do not fit | "Tiling 5 windows - 1 does not fit" |
+| Active, some do not fit | "Tiling 5 windows on 1 display - 1 does not fit" |
 | Active, some minimised to make room | "Tiling 18 windows on 2 displays - 15 minimised to make room" |
 | Paused, never resumed yet (first run) | "Tiling paused - choose Resume tiling to start" |
 | Paused by the user | "Tiling paused" |
@@ -311,7 +311,7 @@ A status line text stays until the state changes. It is not timed, so there is n
 | <display name> - Desktop <n> | Header in the "Windows" submenu |
 | <n> windows on other Spaces | Grey line in the "Windows" submenu |
 | <n>% | Share in the "Windows" submenu, and resize label (UX-16) |
-| Tiling 5 windows - 1 does not fit | Status line |
+| Tiling 5 windows on 1 display - 1 does not fit | Status line |
 | Tiling paused | Status line |
 | Tiling paused - choose Resume tiling to start | Status line on the first run, before the user ever resumed |
 | Windows restored - tiling paused | Status line after Untile |
@@ -332,7 +332,7 @@ A status line text stays until the state changes. It is not timed, so there is n
 | Start at login | Menu item (checkbox) |
 | Start at login (approve in System Settings) | Menu item, when macOS needs approval |
 | Quit TILE32 | Menu item |
-| Dump layout trees, Copy diagnostics | Debug builds only |
+| Dump layout trees, Log Spaces, Log windows, Frame write test (moves windows), Copy diagnostics | Debug builds only |
 | (does not fit) | Suffix in the "Windows" submenu |
 | (minimised to make room) | Suffix in the "Windows" submenu |
 | Window limit | Menu item (submenu) |
