@@ -454,11 +454,14 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Done when:** `spctl --assess --type execute` accepts the stapled app, it runs on a clean user account, and the Space functions are reported as found.
 - **Depends on:** T-3.7
 
-### [ ] T-3.9 Remember layouts across restarts (candidate)
+### [~] T-3.9 Remember layouts across restarts (candidate)
 - **Do:** Store each layout (with weights) per Space UUID and display, with window descriptors (bundle id, title, index). On start, match windows and rebuild trees; unmatched windows are appended. Decide with the owner whether to keep it (OQ-7).
 - **Traces:** US-26, TA-19, TA-20, OQ-7
 - **Done when:** after quitting and restarting TILE32 with the same windows open, the arrangement of each Space comes back for the windows that can be matched, or the owner decides to drop US-26.
 - **Depends on:** T-1.5
+- **Progress:** layouts are saved after every change, drop and resize, keyed by Space UUID and display UUID, with proportions; windows are described by app, a SHA-256 hash of the title (the title itself is never stored, N-4) and their position among the app's windows. On the first visit after a restart, the stored layout is rebuilt for the windows that match; unmatched windows join as new ones. 3 tests, including a full restart with a split and changed proportions that writes nothing.
+- **Errors found:** several windows of one app with the same title were matched to the wrong places. Fixed: match by title and position first, by title only when it is unique, then by position. Resolved 2026-10-18.
+- **Open:** the owner decides whether to keep US-26 (OQ-7) after trying a restart with real windows.
 
 ### [ ] T-3.10 [owner] M3 acceptance and release check
 - **Do:** Go through the M3 checklist, then the full checklist of all milestones once more on the notarized build.

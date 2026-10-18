@@ -649,3 +649,52 @@ struct ExcludeReconcileTests {
         #expect(ids(await engine.trees[key2]) == [1, 3, 2])    // joins again (US-22.3)
     }
 }
+
+@Suite("Remembered layouts (US-26)")
+struct StoredLayoutTests {
+    @Test func arrangementAndProportionsSurviveARestart() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(3, x: 3000); world.add(4, x: 4000)
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        // A over D in the first column, then A's column made wider.
+        let a = world.window(1)!.frame
+        _ = await first.drop(WindowID(4), at: CGPoint(x: a.midX, y: a.maxY - 20), displays: bothDisplays,
+                             currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        var wide = world.window(1)!.frame
+        wide.size.width = 2560 - 3 - wide.minX
+        world.update(1) { $0.frame = wide }
+        _ = await first.resize(WindowID(1), to: wide, edges: [.right], final: true, displays: bothDisplays,
+                               currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let before = await first.trees[key2]!
+        let stored = await first.exportLayouts(world.observe())
+        #expect(stored.keys.contains("U4/DELL"))
+
+        // TILE32 restarts: a new engine, the same windows.
+        let second = LayoutEngine(writer: world)
+        await second.importLayouts(stored)
+        let summary = await second.reconcile(world.observe())
+        #expect(await second.trees[key2] == before)
+        #expect(summary.written == 0)   // nothing moves: the windows are already where the layout puts them
+    }
+
+    @Test func unmatchedWindowsJoinAsNewOnes() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500)
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        let stored = await first.exportLayouts(world.observe())
+        world.remove(2)
+        world.add(7, x: 3000, pid: 300)        // a window of another app
+        let second = LayoutEngine(writer: world)
+        await second.importLayouts(stored)
+        _ = await second.reconcile(world.observe())
+        #expect(ids(await second.trees[key2]) == [1, 7])
+    }
+
+    @Test func titlesAreHashedNotStored() {
+        let hash = WindowDescriptor.hash("Inbox - private@example.com")
+        #expect(hash.count == 16)
+        #expect(!hash.contains("Inbox"))
+    }
+}

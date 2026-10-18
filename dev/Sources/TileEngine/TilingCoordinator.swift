@@ -183,11 +183,29 @@ public final class TilingCoordinator {
             let observation = await observe()
             lastObservation = observation
             let summary = await engine.reconcile(observation, limits: limits(), excludedBundleIDs: excludedBundleIDs())
-            if summary.changedAnything { lastWrite = .now }
+            if summary.changedAnything {
+                lastWrite = .now
+                await saveLayouts(observation)
+            }
             if summary.minimised > 0 || summary.restored > 0 || summary.arrived > 0 { lastAnimation = .now }
             lastSummary = summary
             onChange()
         } while runAgain && state == .running
+    }
+
+    /// Remembered layouts (US-26): saved after changes, offered once after a restart.
+    public var layoutStore: StoredLayoutStore?
+
+    public func restoreLayouts() async {
+        guard let layoutStore else { return }
+        await engine.importLayouts(layoutStore.load())
+    }
+
+    private func saveLayouts(_ observation: Observation) async {
+        guard let layoutStore else { return }
+        var all = layoutStore.load()
+        for (key, value) in await engine.exportLayouts(observation) { all[key] = value }
+        layoutStore.save(all)
     }
 
     /// One reading of the shown desktops: windows, Spaces, order of use, unanswered and
@@ -243,6 +261,7 @@ public final class TilingCoordinator {
             _ = await engine.drop(id, at: point, displays: table, currentSpaces: spaces, snapshots: snapshots)
         }
         lastWrite = .now
+        await saveLayouts(observation)
         onChange()
     }
 
@@ -259,7 +278,10 @@ public final class TilingCoordinator {
         let share = await engine.resize(WindowID(UInt64(number)), to: frame, edges: edges, final: final, displays: table,
                                         currentSpaces: spaceService.currentSpaces(on: table), snapshots: snapshots)
         lastWrite = .now
-        if final { onChange() }
+        if final {
+            await saveLayouts(observation)
+            onChange()
+        }
         return share
     }
 

@@ -96,6 +96,16 @@ extension LayoutEngine {
                 .sorted { ($0.snapshot.frame?.minX ?? 0, $0.id.raw) < ($1.snapshot.frame?.minX ?? 0, $1.id.raw) }
             let observedIDs = Set(observed.map(\.id))
 
+            // First visit after a restart: the stored arrangement, as far as windows match (US-26).
+            if !rebuild, trees[key] == nil, !observed.isEmpty,
+               let restored = restoredTree(for: key, space: space, observed: observed) {
+                var tree = restored
+                for record in observed where !tree.contains(record.id) {
+                    tree = tree.appending(record.id, availableWidth: display.usableArea.width - Self.gap)
+                }
+                trees[key] = tree
+            }
+
             guard !rebuild, var tree = trees[key] else {
                 // First visit, or "Tile now": a fresh arrangement with the limit.
                 guard !observed.isEmpty else { trees[key] = nil; continue }

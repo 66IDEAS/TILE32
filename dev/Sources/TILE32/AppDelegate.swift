@@ -58,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator?.excludedBundleIDs = { [weak self] in
             Set(self?.excludedStore.load().map(\.bundleID) ?? [])
         }
+        coordinator?.layoutStore = StoredLayoutStore()
+        if let coordinator { Task { await coordinator.restoreLayouts() } }
 
         menuBar = MenuBarController(
             state: baseMenuState(),
