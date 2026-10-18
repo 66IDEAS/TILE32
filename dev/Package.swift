@@ -28,6 +28,7 @@ let package = Package(
         .testTarget(name: "TileGeometryTests", dependencies: ["TileGeometry"]),
         .testTarget(name: "TileSpacesTests", dependencies: ["TileSpaces"]),
         .testTarget(name: "TileInputTests", dependencies: ["TileInput"]),
+        .testTarget(name: "TileLogTests", dependencies: ["TileLog"]),
         .testTarget(name: "TileEngineTests", dependencies: ["TileEngine", "TileCore", "TileAX", "TileGeometry", "TileSpaces"]),
     ]
 )

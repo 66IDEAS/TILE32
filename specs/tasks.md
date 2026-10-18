@@ -76,12 +76,12 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Done when:** conversion tests pass for the owner's arrangement (ultrawide and laptop side by side, with different heights), and a debug log lists both displays with correct usable areas.
 - **Depends on:** T-0.1
 
-### [~] T-0.9 Logging and debug menu
+### [x] T-0.9 Logging and debug menu
 - **Do:** Add `os.Logger` with subsystem `com.66ideas.tile32` and categories `engine`, `ax`, `drag`, `resize`, `spaces`, `layout`, `ui`. Titles are logged only in debug builds. Add the debug-only "Debug" submenu with "Dump layout trees" and "Copy diagnostics" placeholders.
 - **Traces:** TA-23
 - **Done when:** `log stream --predicate 'subsystem == "com.66ideas.tile32"'` shows messages from a debug build, and none of them contain window titles in a release build.
 - **Depends on:** T-0.1
-- **Progress:** the loggers live in a small extra module `TileLog`, because `TileCore` must not import `os`. Messages from the signed debug build appear in `/usr/bin/log` (in zsh, plain `log` is a shell built-in, so use the full path). The "Debug" submenu with "Dump layout trees" and "Copy diagnostics" now exists in debug builds (T-0.10). Open: the release-build check for titles, which needs the release mode of T-0.2.
+- **Progress:** the loggers live in a small extra module `TileLog`, because `TileCore` must not import `os`. Messages from the signed debug build appear in `/usr/bin/log` (in zsh, plain `log` is a shell built-in, so use the full path). The "Debug" submenu with "Dump layout trees" and "Copy diagnostics" now exists in debug builds (T-0.10). The release-build check passed on 2026-10-18: `TileLogTests` runs in both configurations (`swift test` and `swift test -c release -Xswiftc -enable-testing`) and shows that release builds log "<title>" instead of a window title. Done.
 
 ### [x] T-0.10 Menu-bar shell
 - **Do:** Create the status item with the three icon states (`rectangle.split.2x2`, `rectangle.dashed`, `exclamationmark.triangle`, template images), and a menu rebuilt in `menuNeedsUpdate` with the status line, "Tile now", "Windows" (empty for now) and "Quit TILE32". No Dock icon. VoiceOver label "TILE32" with the state as its value.
