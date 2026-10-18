@@ -17,7 +17,7 @@ let package = Package(
         .target(name: "TileSpaces", dependencies: ["TileGeometry", "TileLog"]),
         .target(name: "TileAX", dependencies: ["TileCore", "TileGeometry", "TileLog"]),
         .target(name: "TileEngine", dependencies: ["TileCore", "TileGeometry", "TileSpaces", "TileAX", "TileLog"]),
-        .target(name: "TileInput", dependencies: ["TileCore", "TileGeometry", "TileEngine", "TileLog"]),
+        .target(name: "TileInput", dependencies: ["TileCore", "TileGeometry", "TileSpaces", "TileEngine", "TileLog"]),
         .target(name: "TileUI", dependencies: ["TileCore", "TileEngine", "TileLog"]),
         .executableTarget(
             name: "TILE32",
@@ -27,6 +27,7 @@ let package = Package(
         .testTarget(name: "TileCoreTests", dependencies: ["TileCore"]),
         .testTarget(name: "TileGeometryTests", dependencies: ["TileGeometry"]),
         .testTarget(name: "TileSpacesTests", dependencies: ["TileSpaces"]),
+        .testTarget(name: "TileInputTests", dependencies: ["TileInput"]),
         .testTarget(name: "TileEngineTests", dependencies: ["TileEngine", "TileCore", "TileAX", "TileGeometry", "TileSpaces"]),
     ]
 )

@@ -3,6 +3,7 @@ import AppKit
 import TileAX
 import TileEngine
 import TileGeometry
+import TileInput
 import TileLog
 import TileSpaces
 import TileUI
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var displays: DisplayMonitor?
     private var permission: PermissionMonitor?
     private var spaces: SpaceMonitor?
+    private var dragTracker: MouseDragTracker?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -65,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 diagnostics: { [weak self] in self?.diagnostics() ?? "" }
             )
         )
+
+        updateDragLogging(granted: permission.isGranted)
 
         // The first-run explanation, once per launch while the permission is missing (UX-8).
         if !permission.isGranted {
@@ -151,6 +155,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func permissionChanged(_ granted: Bool) {
         menuBar?.update(Self.menuState(permissionGranted: granted))
+        updateDragLogging(granted: granted)
+    }
+
+    /// Spike S1 (T-0.21): in debug builds, every press, drag and resize is logged while the
+    /// permission is granted. Nothing is changed.
+    private func updateDragLogging(granted: Bool) {
+        #if DEBUG
+        if granted {
+            if dragTracker == nil {
+                dragTracker = MouseDragTracker(
+                    displays: { [weak self] in self?.displays?.table ?? DisplayTable(screens: []) },
+                    describe: { number, pid in await Self.describeWindow(number: number, pid: pid) }
+                )
+            }
+            dragTracker?.start()
+        } else {
+            dragTracker?.stop()
+        }
+        #endif
+    }
+
+    /// App name and TILE32's classification of one window, for the S1 log.
+    private static func describeWindow(number: CGWindowID, pid: pid_t) async -> String {
+        guard let running = NSRunningApplication(processIdentifier: pid) else { return "pid \(pid)" }
+        let app = AppInfo(pid: pid, bundleID: running.bundleIdentifier, name: running.localizedName ?? "?")
+        guard running.activationPolicy == .regular else { return "\(app.name) [not a regular app]" }
+        let results = await WindowReader.readAll([app]) { SkyLightSpaceService.shared.windowNumber(of: $0) }
+        guard let snapshot = results.first?.windows.first(where: { $0.windowNumber == number }) else {
+            return "\(app.name) [not listed]"
+        }
+        let classification: String = switch WindowClassifier.classify(snapshot) {
+        case .tiled: "tiled"
+        case .minimised: "minimised"
+        case .floating(let reason): "floating: \(reason.rawValue)"
+        }
+        return "\(app.name) [\(classification)]"
     }
 
     /// Until the engine exists (T-0.24) nothing is tiled, so a granted permission shows the

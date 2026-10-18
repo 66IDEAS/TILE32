@@ -160,10 +160,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Done when:** `specs/spikes.md` lists which apps accept frames, which have minimum sizes, which are slow, and whether the enhanced-UI workaround is needed.
 - **Depends on:** T-0.19, T-0.16
 
-### [ ] T-0.21 Drag and resize tracker, logging only (S1)
+### [~] T-0.21 Drag and resize tracker, logging only (S1)
 - **Do:** Implement the `MouseDragTracker` state machine (Idle, Pressed, Dragging, Resizing) with listen-only global monitors for mouse events, the press hit test against the engine's frame snapshot (frames enlarged by 6 points, a 40 point title band), the lockstep rule on `Moved` notifications, and the switch to `Resizing` on `Resized` notifications. Add the Escape key monitor, active only while dragging. In this task the tracker only logs transitions; it changes nothing.
 - **Traces:** S1, TA-14, OQ-1, US-13, US-17
 - **Done when:** a debug build logs every transition with the window and the reason.
+- **Progress:** `DragStateMachine` (pure, 11 unit tests: title-bar drag, click, content drag, edge and corner resize, app-driven move, move below the band, Escape, reset) and `MouseDragTracker` with listen-only global monitors; it starts automatically in debug builds while the permission is granted, and logs app name and classification but never titles. Deviation from TA-14 for the spike: the window under the cursor and its frame come from the window server's public list (front-to-back order, answers in milliseconds) instead of the engine snapshot and Accessibility notifications; the press area is enlarged by 6 points for resize edges. Spike S1 decides which source the final version uses. The keyboard monitor installs; whether Escape arrives with the Accessibility permission alone is answered in T-0.22. Open: confirmation with real mouse events in T-0.22.
 - **Depends on:** T-0.14
 
 ### [ ] T-0.22 [owner] Spike session C: drag detection (S1)
