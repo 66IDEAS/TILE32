@@ -9,6 +9,7 @@ import TileLog
 public final class OverlayController {
     private var panels: [DisplayID: NSPanel] = [:]
     private var shownOn: DisplayID?
+    private var lastAnnounced = ""
 
     public init() {}
 
@@ -40,6 +41,7 @@ public final class OverlayController {
         (panel.contentView as? OverlayView)?.update(area: local, label: label)
         panel.orderFrontRegardless()
         shownOn = display.id
+        announce(label)
     }
 
     /// Only the label pill, centred in `area`, without a highlight: the share while resizing (UX-16).
@@ -52,6 +54,18 @@ public final class OverlayController {
     public func hide() {
         if let shownOn { panels[shownOn]?.orderOut(nil) }
         shownOn = nil
+        lastAnnounced = ""
+    }
+
+    /// VoiceOver hears each new label once, politely (UX-14, UQ-2). The panel itself stays
+    /// hidden from VoiceOver.
+    private func announce(_ label: String) {
+        guard label != lastAnnounced else { return }
+        lastAnnounced = label
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+            .announcement: label,
+            .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+        ])
     }
 
     private func makePanel() -> NSPanel {
@@ -95,7 +109,7 @@ final class OverlayView: NSView {
         let accent = NSColor.controlAccentColor
         let box = area.insetBy(dx: Self.inset, dy: Self.inset)
         if labelOnly {
-            drawLabel(in: box, color: highContrast ? .labelColor : accent)
+            drawLabel(in: box, color: highContrast ? .labelColor : Self.readableLabelColor(accent: accent))
             return
         }
         let path = NSBezierPath(roundedRect: box, xRadius: Self.cornerRadius, yRadius: Self.cornerRadius)
@@ -107,7 +121,28 @@ final class OverlayView: NSView {
         stroke.lineWidth = border
         accent.setStroke()
         stroke.stroke()
-        drawLabel(in: box, color: highContrast ? .labelColor : accent)
+        drawLabel(in: box, color: highContrast ? .labelColor : Self.readableLabelColor(accent: accent))
+    }
+
+    /// The accent colour when it reads well on the pill (contrast at least 4.5:1, WCAG AA),
+    /// otherwise the primary text colour (UX-14, UQ-3).
+    static func readableLabelColor(accent: NSColor) -> NSColor {
+        let pill = NSColor.windowBackgroundColor
+        return contrast(accent, pill) >= 4.5 ? accent : .labelColor
+    }
+
+    static func contrast(_ a: NSColor, _ b: NSColor) -> Double {
+        let la = luminance(a), lb = luminance(b)
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
+
+    static func luminance(_ color: NSColor) -> Double {
+        guard let rgb = color.usingColorSpace(.sRGB) else { return 0.5 }
+        func channel(_ value: CGFloat) -> Double {
+            let v = Double(value)
+            return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(rgb.redComponent) + 0.7152 * channel(rgb.greenComponent) + 0.0722 * channel(rgb.blueComponent)
     }
 
     /// 13 point semibold on a pill; wraps to two lines when narrow, hidden when it still

@@ -435,11 +435,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Depends on:** T-1.1
 - **Result:** the permission monitor switches the coordinator to "no permission" (no reconcile, no drop, no resize), stops the drag tracker, hides the overlay, and shows the warning menu; it resumes without a restart when the permission returns (paths built in M0 and M1). Claude does not remove the permission itself (security setting). Waiting for the owner check: remove TILE32 from the Accessibility list while it runs, then add it again.
 
-### [ ] T-3.6 Accessibility of TILE32 itself
+### [~] T-3.6 Accessibility of TILE32 itself
 - **Do:** Check the VoiceOver labels and values, section headers in the Windows submenu, and the polite announcement of overlay labels if it is cheap (UQ-2). Check the label contrast with every macOS accent colour (UQ-3).
 - **Traces:** UX-14, N-7
 - **Done when:** VoiceOver reads the whole menu correctly, and the contrast check is recorded.
 - **Depends on:** T-2.2
+- **Progress:** the overlay announces each new label once to VoiceOver (UQ-2), the panel itself is hidden from VoiceOver; status item label, value and help, and real section headers in the submenus were built earlier. Contrast measured for all eight accent colours (`tmp/tools/accent-contrast.swift`): none passes 4.5:1 in light mode, all pass in dark mode; the label now picks the accent colour only when it passes (UQ-3 answered, UX-10 updated). Waiting for the owner to listen with VoiceOver once.
 
 ### [ ] T-3.7 Text audit
 - **Do:** Compare every visible string in the app with the table in UX-15, and check sentence case, no exclamation marks and no em dashes.
