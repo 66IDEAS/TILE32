@@ -165,32 +165,9 @@ extension LayoutEngine {
 
         let restoredSnapshots = Dictionary(toRestore.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
 
-        // Frames: write a window when its tile changed, or when it moved away from its tile
-        // (put back at most `maximumRetries` times, TA-12).
-        var batch: [FrameAssignment] = []
-        for display in observation.displays.displays {
-            let space = observation.currentSpaces[display.id]
-            if space?.isFullScreen == true { continue }
-            guard let tree = trees[LayoutKey(space: space?.id, display: display.id)] else { continue }
-            for (id, frame) in tree.frames(in: display.usableArea, gap: Self.gap) {
-                guard let snapshot = records[id]?.snapshot ?? restoredSnapshots[id] else { continue }
-                let tileChanged = lastTile[id].map { !Self.close($0, frame) } ?? true
-                if tileChanged {
-                    retries[id] = 0
-                    if let current = snapshot.frame, Self.close(current, frame) {
-                        lastTile[id] = frame
-                        continue
-                    }
-                    batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
-                    continue
-                }
-                guard !doesNotFit.contains(id), let current = snapshot.frame, !Self.close(current, frame, tolerance: FrameWriteResult.stepTolerance) else { continue }
-                let attempts = retries[id] ?? 0
-                guard attempts < Self.maximumRetries else { continue }
-                retries[id] = attempts + 1
-                batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
-            }
-        }
+        var snapshots = restoredSnapshots
+        for (id, record) in records { snapshots[id] = record.snapshot }
+        let batch = frameBatch(displays: observation.displays, currentSpaces: observation.currentSpaces, snapshots: snapshots)
         // Windows that come back get their frame while still minimised, then are restored, so
         // they animate straight into their tile; writing during the restore animation fails
         // (found in the owner's step 9 check).
@@ -212,5 +189,43 @@ extension LayoutEngine {
                 """)
         }
         return summary
+    }
+
+    /// The frames to write for the shown layouts (TA-12): a window is written when its tile
+    /// changed, or when it moved away from its tile (put back at most `maximumRetries` times).
+    /// Windows in `force` are always written, for example a window the user just dropped.
+    func frameBatch(displays: DisplayTable, currentSpaces: [DisplayID: SpaceInfo],
+                    snapshots: [WindowID: WindowSnapshot], force: Set<WindowID> = []) -> [FrameAssignment] {
+        var batch: [FrameAssignment] = []
+        for display in displays.displays {
+            let space = currentSpaces[display.id]
+            if space?.isFullScreen == true { continue }
+            guard let tree = trees[LayoutKey(space: space?.id, display: display.id)] else { continue }
+            for (id, frame) in tree.frames(in: display.usableArea, gap: Self.gap) {
+                guard let snapshot = snapshots[id] else { continue }
+                if force.contains(id) {
+                    retries[id] = 0
+                    batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
+                    continue
+                }
+                let tileChanged = lastTile[id].map { !Self.close($0, frame) } ?? true
+                if tileChanged {
+                    retries[id] = 0
+                    if let current = snapshot.frame, Self.close(current, frame) {
+                        lastTile[id] = frame
+                        continue
+                    }
+                    batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
+                    continue
+                }
+                guard !doesNotFit.contains(id), let current = snapshot.frame,
+                      !Self.close(current, frame, tolerance: FrameWriteResult.stepTolerance) else { continue }
+                let attempts = retries[id] ?? 0
+                guard attempts < Self.maximumRetries else { continue }
+                retries[id] = attempts + 1
+                batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
+            }
+        }
+        return batch
     }
 }

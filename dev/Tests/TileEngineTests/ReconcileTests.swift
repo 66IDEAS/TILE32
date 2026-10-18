@@ -381,3 +381,142 @@ struct ReconcileTests {
         #expect(ids(await engine.trees[LayoutKey(space: SpaceID(108), display: dell)]) == [1080, 1081, 1082])
     }
 }
+
+private func snapshots(_ observation: Observation) -> [WindowID: WindowSnapshot] {
+    Dictionary(observation.records.map { ($0.id, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
+}
+
+private func current(_ space: SpaceInfo, _ displays: DisplayTable = bothDisplays) -> [DisplayID: SpaceInfo] {
+    Dictionary(displays.displays.map { ($0.id, space) }, uniquingKeysWith: { first, _ in first })
+}
+
+@Suite("Drops (M2, US-14 to US-18)")
+struct DropTests {
+    /// Three windows side by side on the Dell, tiled.
+    private func setUp() async -> (World, LayoutEngine) {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(3, x: 3000)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        return (world, engine)
+    }
+
+    @Test func dropOnTheBottomEdgeSplitsTheTarget() async {
+        let (world, engine) = await setUp()
+        world.add(4, x: 4000)
+        _ = await engine.reconcile(world.observe())
+        // US-15.4: D dropped on the bottom edge of A.
+        let a = world.window(1)!.frame
+        let outcome = await engine.drop(WindowID(4), at: CGPoint(x: a.midX, y: a.maxY - 20), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .split)
+        #expect(shape(await engine.trees[key2]!) == "H(V(1,4),2,3)")
+        #expect(world.window(4)!.frame.minY > world.window(1)!.frame.maxY)
+    }
+
+    @Test func dropOnTheCentreSwapsAndSizesStayWithTheTiles() async {
+        let (world, engine) = await setUp()
+        let tile1 = world.window(1)!.frame, tile3 = world.window(3)!.frame
+        let outcome = await engine.drop(WindowID(1), at: CGPoint(x: tile3.midX, y: tile3.midY), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .swapped)
+        #expect(ids(await engine.trees[key2]) == [3, 2, 1])
+        #expect(world.window(1)!.frame == tile3)
+        #expect(world.window(3)!.frame == tile1)
+    }
+
+    @Test func dropOnNothingSnapsBack() async {
+        let (world, engine) = await setUp()
+        let tile = world.window(2)!.frame
+        world.update(2) { $0.frame = $0.frame.offsetBy(dx: 0, dy: 400) }   // the user dragged it
+        let outcome = await engine.drop(WindowID(2), at: CGPoint(x: -3000, y: 100), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .snappedBack)
+        #expect(world.window(2)!.frame == tile)
+        #expect(ids(await engine.trees[key2]) == [1, 2, 3])
+    }
+
+    @Test func dropOnItsOwnTileSnapsBack() async {
+        let (world, engine) = await setUp()
+        let tile = world.window(2)!.frame
+        world.update(2) { $0.frame = $0.frame.offsetBy(dx: 30, dy: 0) }
+        let outcome = await engine.drop(WindowID(2), at: CGPoint(x: tile.midX, y: tile.midY), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .snappedBack)
+        #expect(world.window(2)!.frame == tile)
+    }
+
+    @Test func dropOnTheEmptyLaptopMovesTheWindowThere() async {
+        let (world, engine) = await setUp()
+        let outcome = await engine.drop(WindowID(3), at: CGPoint(x: -900, y: 700), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .movedToEmptyDisplay)
+        #expect(ids(await engine.trees[key2]) == [1, 2])
+        #expect(ids(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)]) == [3])
+        // It fills the laptop's usable area minus the gap (US-18.3).
+        #expect(world.window(3)!.frame == CGRect(x: -1722, y: 273, width: 1716, height: 1073))
+    }
+
+    @Test func swapAcrossDisplaysExchangesBothWindows() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(9, x: -1000, y: 400, width: 600)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        let laptopTile = world.window(9)!.frame
+        let outcome = await engine.drop(WindowID(1), at: CGPoint(x: laptopTile.midX, y: laptopTile.midY), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .swapped)
+        #expect(ids(await engine.trees[key2]) == [9, 2])
+        #expect(ids(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)]) == [1])
+        #expect(world.window(1)!.frame == laptopTile)
+    }
+
+    @Test func splitAcrossDisplaysLeavesTheSourceTidy() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(9, x: -1000, y: 400, width: 600)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        let laptopTile = world.window(9)!.frame
+        let outcome = await engine.drop(WindowID(2), at: CGPoint(x: laptopTile.minX + 20, y: laptopTile.midY), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .split)
+        #expect(ids(await engine.trees[key2]) == [1])
+        #expect(ids(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)]) == [2, 9])
+        #expect(world.window(1)!.frame.width > 5000)
+    }
+
+    @Test func floatingWindowsAreIgnored() async {
+        let (world, engine) = await setUp()
+        let outcome = await engine.drop(WindowID(77), at: CGPoint(x: 200, y: 200), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .ignored)
+    }
+
+    @Test func previewMatchesTheZone() async {
+        let (world, engine) = await setUp()
+        let a = world.window(1)!.frame
+        let preview = await engine.dropPreview(for: WindowID(3), at: CGPoint(x: a.minX + 10, y: a.midY),
+                                               displays: bothDisplays, currentSpaces: current(desktop2))
+        guard case .window(let target, let zone, _)? = preview?.target else { Issue.record("no preview"); return }
+        #expect(target == WindowID(1))
+        #expect(zone == .left)
+        #expect(preview!.area.width < a.width)
+        // Over the dragged window's own tile there is no preview.
+        let own = await engine.dropPreview(for: WindowID(1), at: CGPoint(x: a.midX, y: a.midY),
+                                           displays: bothDisplays, currentSpaces: current(desktop2))
+        #expect(own == nil)
+    }
+}
+
+/// Compact structure, for example "H(V(1,4),2,3)" (same as in the core tests).
+private func shape(_ tree: LayoutTree) -> String {
+    guard let root = tree.root else { return "empty" }
+    func walk(_ node: LayoutNode) -> String {
+        switch node {
+        case .leaf(let id): return "\(id.raw)"
+        case .split(let direction, let children):
+            return (direction == .horizontal ? "H(" : "V(") + children.map { walk($0.node) }.joined(separator: ",") + ")"
+        }
+    }
+    return walk(root)
+}

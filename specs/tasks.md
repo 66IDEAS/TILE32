@@ -342,11 +342,12 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Done when:** dragging over windows on both displays shows the correct zone and label instantly, the overlay never takes clicks or focus, and it looks right in light and dark mode.
 - **Depends on:** T-2.1
 
-### [ ] T-2.3 Apply drops: swap, split, other display, cancel
+### [~] T-2.3 Apply drops: swap, split, other display, cancel
 - **Do:** Implement the engine side of drops: `swapping`, `removing` plus `splitting`, cross-display and empty-display drops, and the snap back for drops without a target. Drops are applied immediately, without the coalescing wait.
 - **Traces:** US-14, US-15, US-17.2, US-17.3, US-18, US-19.1, TA-4, TA-14
 - **Done when:** the US-15.4 scenario works on the real machine, swaps keep the proportions in place (L1), cross-display drops work in both directions, and every cancel restores the exact layout.
 - **Depends on:** T-2.2
+- **Progress:** engine side done (`Drops.swift`): `dropPreview` for the overlay, `drop` for swap, split, drop on an empty display and drops across displays, `snapBack` for drops without a target; frame writing shared with reconcile (`frameBatch`, the dropped window is always written). 9 drop tests with the simulated world, including the US-15.4 scenario. Waiting for the tracker (T-2.1) and the overlay (T-2.2).
 
 ### [ ] T-2.4 Escape cancel
 - **Do:** If OQ-1 was answered positively in T-0.22, wire the Escape monitor: mark the drag as cancelled, hide the overlay, and snap back on release. Otherwise remove the monitor and note it in the specification (US-17.1).
