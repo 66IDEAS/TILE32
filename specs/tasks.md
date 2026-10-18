@@ -155,10 +155,12 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** `FrameWriter` in `TileAX` (size, position, size, read back, optional enhanced-UI workaround) and `FrameWriteTest` in `TileEngine`. Debug menu item "Frame write test (moves windows)", and `--frame-test-fakewindows`, which limits the test to FakeWindows windows. Run on FakeWindows on 2026-10-18 (`specs/spikes.md`, S2). Restoring works except for a window whose original frame is below its own minimum size. Done 2026-10-18.
 - **Depends on:** T-0.14
 
-### [ ] T-0.20 [owner] Spike session B: frame writing (S2)
+### [x] T-0.20 [owner] Spike session B: frame writing (S2)
 - **Do:** At a moment the owner chooses (windows will move), run the frame write test with Safari, Chrome, VS Code, Terminal, Slack, Teams, Zoom and FakeWindows (minimum-size window).
 - **Traces:** S2, TA-11, US-10
 - **Done when:** `specs/spikes.md` lists which apps accept frames, which have minimum sizes, which are slow, and whether the enhanced-UI workaround is needed.
+- **Result:** passed on 2026-10-18 (`specs/spikes.md`, S2). All owner windows restored exactly; slowest write 192 ms; the workaround is not needed.
+- **Errors found:** Terminal sizes in character steps and was wrongly counted as "does not fit", which would have made TILE32 retry it. Fixed with a 16 point size-step tolerance (`FrameWriteResult.fits`, 4 tests). Resolved 2026-10-18.
 - **Depends on:** T-0.19, T-0.16
 
 ### [~] T-0.21 Drag and resize tracker, logging only (S1)

@@ -178,7 +178,7 @@ public actor LayoutEngine {
                 doesNotFit.insert(id)
             } else {
                 doesNotFit.remove(id)
-                if result.matches { matched += 1 } else { failed += 1 }
+                if result.fits { matched += 1 } else { failed += 1 }
             }
         }
         let summary = TileSummary(layouts: layouts, windows: batch.count, matched: matched, doesNotFit: notFitting, failed: failed)
@@ -208,7 +208,7 @@ public actor LayoutEngine {
             expected[item.id] = ExpectedFrame(frame: item.frame, generation: generation, deadline: deadline)
         }
         let results = await writer.write(batch)
-        let failed = batch.filter { results[$0.id]?.matches != true && results[$0.id]?.doesNotFit != true }.count
+        let failed = batch.filter { results[$0.id]?.fits != true && results[$0.id]?.doesNotFit != true }.count
 
         originals.removeAll()
         trees.removeAll()

@@ -114,3 +114,18 @@ Run with the debug build logging every Space switch. Window titles are not recor
 | 9 | desktop | 7 | (desktop UUID removed) |
 
 After the owner's next logout or restart, "Log Spaces" is compared with this table.
+
+## S2 Frame writing with the owner's windows - passed (2026-10-18, session B)
+
+All tiled windows on desktop 2 (9 windows of ChatGPT, Claude, VS Code, Safari, Slack, Terminal, plus one FakeWindows window with a minimum size) were sized smaller, to half the Dell, and onto the laptop display, each with and without the enhanced-UI workaround, then put back. The whole run took 4 seconds.
+
+| App | Result | Slowest write |
+|---|---|---|
+| ChatGPT, Claude, VS Code, Safari, Slack | every write landed exactly | 192 ms (Safari) |
+| Terminal | lands within a few points: it sizes in character steps (+1 to +6 points) | 22 ms |
+| FakeWindows, minimum size 1800 x 1000 | detected as "does not fit" | 14 ms |
+
+- **Every window of the owner was restored exactly.** The only window not restored was the FakeWindows test window, whose original frame is below its own minimum size (expected, see the FakeWindows run).
+- **The enhanced-UI workaround never made a difference.** TILE32 does not use it (TA-11 updated).
+- **Size steps:** Terminal (and other apps that size in steps) must count as fitted, otherwise TILE32 would mark it as "does not fit" and retry. Fixed: a window counts as fitted within 16 points of the requested size (`FrameWriteResult.fits`); only a window more than 16 points larger counts as "does not fit". 4 new tests.
+- No write returned an error.

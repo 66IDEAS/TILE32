@@ -17,6 +17,8 @@ public enum FrameWriteTest {
             .filter { WindowClassifier.classify($0.snapshot) == .tiled && $0.snapshot.frame != nil }
             .sorted { $0.id.raw < $1.id.raw }
         Log.layout.info("S2 frame write test: \(windows.count) tiled windows\(onlyBundleID.map { " of \($0)" } ?? "", privacy: .public)")
+        // Per app: cases that matched, did not fit or differed, slowest write, workaround effect.
+        var summary: [String: (matched: Int, notFit: Int, differed: Int, slowest: Duration, workaroundHelped: Int)] = [:]
 
         for record in windows {
             guard let original = record.snapshot.frame,
@@ -33,12 +35,19 @@ public enum FrameWriteTest {
                                                       height: min(700, other.usableArea.height - 12))))
             }
 
+            let app = record.snapshot.app.name
             for (name, frame) in cases {
+                var plainMatched = false
                 for workaround in [false, true] {
                     let result = await AXWorker.shared.run(for: record.snapshot.app.pid) {
                         FrameWriter.write(frame, to: record.snapshot.element, pid: record.snapshot.app.pid, disableEnhancedUI: workaround)
                     }
                     log(record, case: name, workaround: workaround, result: result)
+                    var entry = summary[app] ?? (0, 0, 0, .zero, 0)
+                    if result.fits { entry.matched += 1 } else if result.doesNotFit { entry.notFit += 1 } else { entry.differed += 1 }
+                    entry.slowest = max(entry.slowest, result.duration)
+                    if !workaround { plainMatched = result.matches } else if result.matches && !plainMatched { entry.workaroundHelped += 1 }
+                    summary[app] = entry
                 }
             }
             let restore = await AXWorker.shared.run(for: record.snapshot.app.pid) {
@@ -46,11 +55,18 @@ public enum FrameWriteTest {
             }
             Log.layout.info("S2   \(record.id.description, privacy: .public) restored: \(restore.matches ? "yes" : "no", privacy: .public)")
         }
+        for (app, entry) in summary.sorted(by: { $0.key < $1.key }) {
+            Log.layout.info("""
+                S2 summary \(app, privacy: .public): \(entry.matched) matched, \(entry.notFit) do not fit, \(entry.differed) differ, \
+                slowest \(entry.slowest.formatted(.units(allowed: [.milliseconds])), privacy: .public), \
+                workaround helped \(entry.workaroundHelped) times
+                """)
+        }
         Log.layout.info("S2 frame write test finished")
     }
 
     private static func log(_ record: WindowRecord, case name: String, workaround: Bool, result: FrameWriteResult) {
-        let outcome = result.matches ? "matches" : result.doesNotFit ? "does not fit" : "differs"
+        let outcome = result.matches ? "matches" : result.fits ? "fits within a size step" : result.doesNotFit ? "does not fit" : "differs"
         Log.layout.info("""
             S2   \(record.id.description, privacy: .public) \(record.snapshot.app.name, privacy: .public) \
             \(name, privacy: .public)\(workaround ? " with workaround" : "", privacy: .public): \(outcome, privacy: .public), \

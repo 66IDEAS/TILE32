@@ -40,6 +40,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // `--frame-test-fakewindows` runs the S2 tool on FakeWindows windows only, so frame
         // writing can be checked without moving any of the owner's windows.
+        // `--frame-test-all` (session B): the S2 tool on every tiled window of the shown
+        // desktop. Moves the owner's windows; only with the owner's agreement.
+        if CommandLine.arguments.contains("--frame-test-all") {
+            Task {
+                await frameWriteTest(onlyBundleID: nil)
+                NSApp.terminate(nil)
+            }
+            return
+        }
         if CommandLine.arguments.contains("--frame-test-fakewindows") {
             Task {
                 await frameWriteTest(onlyBundleID: "com.66ideas.tile32.FakeWindows")

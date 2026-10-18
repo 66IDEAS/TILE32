@@ -12,10 +12,23 @@ public struct FrameWriteResult: Sendable {
     public let sizeError: AXError
     public let duration: Duration
 
-    /// The window stayed larger than requested: it has a minimum size (US-10). 2 point tolerance.
+    /// Apps such as Terminal size their windows in steps (character cells), so they end a
+    /// few points away from the request (session B: up to 6 points). Within this tolerance
+    /// a window counts as fitted and is not retried, so TILE32 never fights such an app.
+    public static let stepTolerance: CGFloat = 16
+
+    /// The window stayed clearly larger than requested: it has a minimum size (US-10).
     public var doesNotFit: Bool {
         guard let actual else { return false }
-        return actual.width > requested.width + 2 || actual.height > requested.height + 2
+        return actual.width > requested.width + Self.stepTolerance || actual.height > requested.height + Self.stepTolerance
+    }
+
+    /// The window landed exactly or within one size step of the request.
+    public var fits: Bool {
+        guard let actual else { return false }
+        let t = Self.stepTolerance
+        return abs(actual.minX - requested.minX) <= 2 && abs(actual.minY - requested.minY) <= 2
+            && abs(actual.width - requested.width) <= t && abs(actual.height - requested.height) <= t
     }
 
     /// Position and size match within 2 points.

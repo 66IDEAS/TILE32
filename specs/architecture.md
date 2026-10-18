@@ -190,9 +190,11 @@ Dialogs, sheets, open and save panels, floating tool windows and popovers normal
 
 ### TA-11 Applying frames to windows
 
-**Description:** The AX layer applies a frame through the attributes `AXSize` and `AXPosition`. To work reliably at display edges and when growing or shrinking across displays, the write sequence is size, position, size. After the writes, the frame is read back. If the resulting size is larger than requested (in either dimension, with a tolerance of 2 points), the window has a minimum size: the engine marks it "does not fit", anchors it at the top-left of its tile, retries once, and stops trying until its tile or the layout changes (US-10).
+**Description:** The AX layer applies a frame through the attributes `AXSize` and `AXPosition`. To work reliably at display edges and when growing or shrinking across displays, the write sequence is size, position, size. After the writes, the frame is read back. If the resulting size is more than 16 points larger than requested in either dimension, the window has a minimum size: the engine marks it "does not fit", anchors it at the top-left of its tile, retries once, and stops trying until its tile or the layout changes (US-10).
 
-Some apps animate or react slowly when the app-level `AXEnhancedUserInterface` attribute is true. For those apps the AX layer sets the attribute to false before a batch of writes and restores the previous value afterwards, which is a widely used workaround. The behaviour is to be verified in spike S2 and kept only if needed.
+Some apps are said to animate or react slowly when the app-level `AXEnhancedUserInterface` attribute is true; the usual workaround is to switch it off around a write. Spike S2 (session B) showed no difference for any of the owner's apps, so TILE32 does not use it; the option stays in `FrameWriter` for apps that may need it later.
+
+Apps such as Terminal size their windows in steps (character cells) and end a few points away from the request. A window within 16 points of the requested size counts as fitted and is not retried; only a window more than 16 points larger counts as "does not fit" (spike S2).
 
 Writes for different apps run in parallel; writes for the same app run in order. Frame writes for one layout pass are issued as one batch so the screen changes in one visual step as far as the OS allows.
 
