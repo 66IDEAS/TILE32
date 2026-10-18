@@ -175,3 +175,23 @@ struct TreeOperationTests {
 }
 
 import CoreGraphics
+
+@Suite("Replacing (L9)")
+struct ReplacingTests {
+    @Test func newWindowTakesTheTileAndItsSize() {
+        let tree = LayoutTree(root: split(.horizontal, (split(.vertical, (leaf(A), 0.3), (leaf(D), 0.7)), 0.5),
+                                          (leaf(B), 0.25), (leaf(C), 0.25)))
+        let replaced = tree.replacing(D, with: E)
+        #expect(shape(replaced) == "H(V(1,5),2,3)")
+        #expect(approx(topWeights(replaced), [0.5, 0.25, 0.25]))
+        guard case .split(_, let children)? = replaced.root else { Issue.record("not a split"); return }
+        #expect(approx(weights(of: children[0].node), [0.3, 0.7]))
+    }
+
+    @Test func missingOldOrPresentNewChangesNothing() {
+        let tree = LayoutTree.flat([A, B])
+        #expect(tree.replacing(E, with: D) == tree)
+        #expect(tree.replacing(A, with: B) == tree)
+        #expect(tree.replacing(A, with: A) == tree)
+    }
+}

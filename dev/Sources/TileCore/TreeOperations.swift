@@ -67,6 +67,14 @@ extension LayoutTree {
         return LayoutTree(root: root.replacingNode(atPath: path[...], with: .split(direction, pair))).normalized()
     }
 
+    /// Puts `new` in the place of `old`; the arrangement and the weights stay the same
+    /// (rule L9: a window swapped in takes the tile of the least recently used one).
+    /// Unchanged if `old` is missing or `new` is already in the tree.
+    public func replacing(_ old: WindowID, with new: WindowID) -> LayoutTree {
+        guard old != new, contains(old), !contains(new) else { return self }
+        return LayoutTree(root: root?.mappingLeaves { $0 == old ? new : $0 })
+    }
+
     /// Sets every split back to equal shares without changing the arrangement (US-28.9).
     public func equalized() -> LayoutTree {
         LayoutTree(root: root?.equalized())

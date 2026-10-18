@@ -81,6 +81,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(tileNow)
         menu.addItem(windowsItem())
         menu.addItem(.separator())
+        menu.addItem(windowLimitItem())
+        menu.addItem(.separator())
 
         #if DEBUG
         menu.addItem(debugItem())
@@ -120,6 +122,25 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             windowsSubmenu.addItem(.separator())
             windowsSubmenu.addItem(disabledItem("\(count) \(count == 1 ? "window" : "windows") on other Spaces"))
         }
+    }
+
+    /// One group per display with the choices 2 to 16 (UX-17).
+    private func windowLimitItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Window limit", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        for entry in state.windowLimits {
+            submenu.addItem(NSMenuItem.sectionHeader(title: entry.displayName))
+            for value in 2...16 {
+                let choice = ActionMenuItem(title: "\(value)") { [actions] in actions.setWindowLimit(entry.displayUUID, value) }
+                choice.state = value == entry.limit ? .on : .off
+                choice.indentationLevel = 1
+                submenu.addItem(choice)
+            }
+        }
+        item.submenu = submenu
+        item.isEnabled = !state.needsPermission && !state.windowLimits.isEmpty
+        return item
     }
 
     private func windowItem(_ entry: WindowMenuEntry) -> NSMenuItem {

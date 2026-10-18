@@ -42,6 +42,18 @@ private final class FakeWriter: FrameWriting, @unchecked Sendable {
         }
         return results
     }
+
+    private var _minimised: Set<WindowID> = []
+    var minimised: Set<WindowID> { lock.withLock { _minimised } }
+
+    func setMinimised(_ windows: [(WindowID, WindowSnapshot)], _ minimised: Bool) async -> Set<WindowID> {
+        lock.withLock {
+            for (id, _) in windows {
+                if minimised { _minimised.insert(id) } else { _minimised.remove(id) }
+            }
+        }
+        return []
+    }
 }
 
 private func record(_ number: UInt64, x: CGFloat, display: DisplayID, subrole: String = "AXStandardWindow", fullScreen: Bool = false) -> WindowRecord {
@@ -127,5 +139,66 @@ struct LayoutEngineTests {
         #expect(await engine.isSelfCaused(WindowID(1), frame: expected.frame.offsetBy(dx: 1, dy: 1), at: later))
         #expect(await !engine.isSelfCaused(WindowID(1), frame: expected.frame.offsetBy(dx: 50, dy: 0), at: later))
         #expect(await !engine.isSelfCaused(WindowID(99), frame: .zero, at: later))
+    }
+}
+
+@Suite("Window limit (L9, US-31)")
+struct WindowLimitTests {
+    @Test func defaultsFollowDisplayWidth() {
+        let limits = WindowLimits()
+        #expect(limits.limit(for: displays.display(id: dell)!) == 12)
+        #expect(limits.limit(for: displays.display(id: laptop)!) == 6)
+    }
+
+    @Test func chosenLimitsAreClamped() {
+        var limits = WindowLimits()
+        limits.set(40, for: dell)
+        limits.set(1, for: laptop)
+        #expect(limits.limit(for: displays.display(id: dell)!) == 16)
+        #expect(limits.limit(for: displays.display(id: laptop)!) == 2)
+        #expect(WindowLimits(chosen: ["DELL": 99]).chosen.isEmpty)
+    }
+
+    @Test func limitsSurviveARestart() {
+        let suite = "com.66ideas.tile32.tests.\(UInt64.random(in: 0...UInt64.max))"
+        let store = WindowLimitStore(suiteName: suite)
+        var limits = store.load()
+        limits.set(4, for: dell)
+        store.save(limits)
+        #expect(WindowLimitStore(suiteName: suite).load().limit(for: displays.display(id: dell)!) == 4)
+        UserDefaults().removePersistentDomain(forName: suite)
+    }
+
+    @Test func mostRecentWindowsGetTilesAndTheRestIsMinimised() async {
+        let writer = FakeWriter()
+        let engine = LayoutEngine(writer: writer)
+        var limits = WindowLimits()
+        limits.set(2, for: dell)
+        let summary = await engine.tileNow(
+            records: [record(1, x: 100, display: dell), record(2, x: 900, display: dell),
+                      record(3, x: 1700, display: dell), record(4, x: 2500, display: dell)],
+            displays: displays, currentSpaces: [dell: space], limits: limits,
+            recency: [WindowID(3), WindowID(1), WindowID(4), WindowID(2)]
+        )
+        #expect(summary.windows == 2)
+        #expect(summary.minimised == 2)
+        #expect(Set(writer.written.keys) == [WindowID(1), WindowID(3)])
+        #expect(writer.minimised == [WindowID(2), WindowID(4)])
+        #expect(await engine.minimisedByEngine == [WindowID(2), WindowID(4)])
+        // The tiled windows keep their left-to-right order.
+        #expect(await engine.trees[LayoutKey(space: SpaceID(4), display: dell)]?.windowIDs == [WindowID(1), WindowID(3)])
+    }
+
+    @Test func windowsTheOrderDoesNotKnowComeLast() async {
+        let writer = FakeWriter()
+        let engine = LayoutEngine(writer: writer)
+        var limits = WindowLimits()
+        limits.set(2, for: dell)
+        _ = await engine.tileNow(
+            records: [record(1, x: 100, display: dell), record(2, x: 900, display: dell), record(3, x: 1700, display: dell)],
+            displays: displays, currentSpaces: [dell: space], limits: limits, recency: [WindowID(3)]
+        )
+        #expect(Set(writer.written.keys) == [WindowID(1), WindowID(3)])
+        #expect(writer.minimised == [WindowID(2)])
     }
 }

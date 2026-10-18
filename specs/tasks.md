@@ -187,10 +187,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Progress:** `LayoutEngine` actor with trees per `LayoutKey` (Space and display), "Tile now" building `flat` trees ordered by left edge inside each usable area, batched writes per app through the `FrameWriting` protocol (`AXFrameWriter` for real windows), "does not fit" marking, and the expected-frame record of TA-12 with `isSelfCaused`. 6 engine tests with a fake writer. Real check on 2026-10-18 with `--tile-now-fakewindows` (FakeWindows only): 6 windows became 6 columns on the Dell, 846 to 847 points wide, exactly 6 points apart, the non-resizable control window untouched. Open: the menu item stays grey for the owner's windows until (1) session B (T-0.20) has run, (2) the owner agrees to a moment, and (3) open question Q-3 is decided, because the current desktop holds 27 windows that would be tiled.
 - **Depends on:** T-0.5, T-0.15, T-0.20
 
-### [ ] T-0.26 Window limit for Tile now
+### [x] T-0.26 Window limit for Tile now
 - **Do:** Add the limits per display (`UserDefaults`, 2 to 16, defaults 12 and 6 by display width), the "Window limit" submenu, `LayoutTree.replacing(_:with:)` with tests, the recency order from the window server's front-to-back list, and make "Tile now" tile the most recent windows up to the limit and minimise the others, remembering them in `minimisedByEngine`. Status line and Windows submenu show windows minimised to make room.
 - **Traces:** US-31.1 to US-31.3, US-3.5, L9, TA-27, UX-17
 - **Done when:** engine tests cover the limit; with FakeWindows only and a limit of 4, "Tile now" tiles the four frontmost test windows and minimises the rest; the limit survives a restart.
+- **Result:** `WindowLimits` and `WindowLimitStore` (defaults 12 and 6 by display width, 2 to 16, stored per display UUID), `LayoutTree.replacing`, `WindowServerList.frontToBack` as the starting order of use, "Tile now" with limit and order, minimising through `WindowActions.setMinimised`, `minimisedByEngine` in the engine, "Window limit" submenu, "(minimised to make room)" entries in the Windows submenu. 8 new tests (113 in total). Real check on 2026-10-18 with FakeWindows only and `--window-limit 4`: the four frontmost test windows were tiled, the other two minimised, the control window untouched. The status line count arrives with the running states in T-1.1. Done 2026-10-18.
 - **Depends on:** T-0.24
 
 ### [ ] T-0.25 [owner] M0 acceptance

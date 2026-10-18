@@ -69,6 +69,13 @@ public enum FrameWriter {
 }
 
 public enum WindowActions {
+    /// Minimises or restores a window (rule L9). Blocking; runs on the app's queue.
+    public static func setMinimised(_ window: AXElementBox, _ minimised: Bool) -> AXError {
+        AXUIElementSetMessagingTimeout(window.element, AXWorker.messagingTimeout)
+        return AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString,
+                                            minimised ? kCFBooleanTrue : kCFBooleanFalse)
+    }
+
     /// Brings one window to the front of its app (US-3.4). Blocking; runs on the app's queue.
     /// The caller then activates the app, so the window ends up in front of everything.
     public static func raise(_ window: AXElementBox) -> AXError {

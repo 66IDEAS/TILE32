@@ -25,6 +25,8 @@ public struct FrameAssignment: Sendable {
 /// Writes frames to real windows. A protocol so engine tests can use a fake (TA-24).
 public protocol FrameWriting: Sendable {
     func write(_ assignments: [FrameAssignment]) async -> [WindowID: FrameWriteResult]
+    /// Minimises or restores windows (rule L9). Returns the windows that failed.
+    func setMinimised(_ windows: [(WindowID, WindowSnapshot)], _ minimised: Bool) async -> Set<WindowID>
 }
 
 /// The real writer: one batch per app on the app's own queue, apps in parallel (TA-11).
@@ -50,6 +52,15 @@ public struct AXFrameWriter: FrameWriting {
             return results
         }
     }
+
+    public func setMinimised(_ windows: [(WindowID, WindowSnapshot)], _ minimised: Bool) async -> Set<WindowID> {
+        var failed: Set<WindowID> = []
+        for (id, window) in windows {
+            let error = await AXWorker.shared.run(for: window.app.pid) { WindowActions.setMinimised(window.element, minimised) }
+            if error != .success { failed.insert(id) }
+        }
+        return failed
+    }
 }
 
 /// A frame TILE32 wrote and expects to see again (TA-12).
@@ -69,6 +80,9 @@ public actor LayoutEngine {
 
     public private(set) var trees: [LayoutKey: LayoutTree] = [:]
     public private(set) var doesNotFit: Set<WindowID> = []
+    /// Windows TILE32 minimised to respect a window limit (rule L9). Windows the user
+    /// minimised are never in here, so TILE32 never brings those back (US-31.8).
+    public private(set) var minimisedByEngine: Set<WindowID> = []
     private var expected: [WindowID: ExpectedFrame] = [:]
     private var generation: UInt64 = 0
     private let writer: FrameWriting
@@ -83,6 +97,8 @@ public actor LayoutEngine {
         public let matched: Int
         public let doesNotFit: Int
         public let failed: Int
+        /// Windows minimised to respect the window limit (rule L9).
+        public var minimised: Int = 0
     }
 
     /// "Tile now" (US-4): equal columns per Space and display, ordered by each window's
@@ -92,6 +108,8 @@ public actor LayoutEngine {
         records: [WindowRecord],
         displays: DisplayTable,
         currentSpaces: [DisplayID: SpaceInfo],
+        limits: WindowLimits = WindowLimits(),
+        recency: [WindowID] = [],
         excludedBundleIDs: Set<String> = []
     ) async -> TileSummary {
         let tiled = records.filter { WindowClassifier.classify($0.snapshot, excludedBundleIDs: excludedBundleIDs) == .tiled }
@@ -102,9 +120,16 @@ public actor LayoutEngine {
             groups[LayoutKey(space: currentSpaces[displayID]?.id, display: displayID), default: []].append(record)
         }
 
+        // Most recently used first (TA-27); windows the order does not know come last.
+        let rank = Dictionary(recency.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         var batch: [FrameAssignment] = []
-        for (key, members) in groups {
+        var toMinimise: [(WindowID, WindowSnapshot)] = []
+        for (key, all) in groups {
             guard let display = displays.display(id: key.display) else { continue }
+            let byUse = all.sorted { (rank[$0.id] ?? .max, $0.id.raw) < (rank[$1.id] ?? .max, $1.id.raw) }
+            let limit = limits.limit(for: display)
+            let members = Array(byUse.prefix(limit))
+            toMinimise += byUse.dropFirst(limit).map { ($0.id, $0.snapshot) }
             let ordered = members.sorted { ($0.snapshot.frame?.minX ?? 0, $0.id.raw) < ($1.snapshot.frame?.minX ?? 0, $1.id.raw) }
             let tree = LayoutTree.flat(ordered.map(\.id))
             trees[key] = tree
@@ -113,7 +138,15 @@ public actor LayoutEngine {
                 if let frame = frames[record.id] { batch.append(FrameAssignment(id: record.id, window: record.snapshot, frame: frame)) }
             }
         }
-        return await apply(batch, layouts: groups.count)
+        var summary = await apply(batch, layouts: groups.count)
+        if !toMinimise.isEmpty {
+            let failed = await writer.setMinimised(toMinimise, true)
+            let done = Set(toMinimise.map(\.0)).subtracting(failed)
+            minimisedByEngine.formUnion(done)
+            summary.minimised = done.count
+            Log.layout.info("Minimised \(done.count) windows to make room, \(failed.count) failed")
+        }
+        return summary
     }
 
     /// Writes a batch, remembers the expected frames, and marks windows that do not fit (US-10).

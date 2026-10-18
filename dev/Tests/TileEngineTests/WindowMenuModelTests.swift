@@ -75,4 +75,14 @@ struct WindowMenuModelTests {
         #expect(text.hasSuffix("bbbbbbbbbbbbbbbbbbbbbb"))
         #expect(WindowMenuModel.middleTruncated("short") == "short")
     }
+
+    @Test func windowsMinimisedToMakeRoomAreListedUnderTheirDisplay() {
+        let content = WindowMenuModel.build(
+            records: [record(1, app: "Mail", title: "Inbox", display: dell),
+                      record(2, app: "Safari", title: "Apple", display: dell, minimised: true),
+                      record(3, app: "Notes", title: "List", display: dell, minimised: true)],
+            displays: displays, currentSpaces: [:], otherSpacesCount: 0, minimisedToMakeRoom: [WindowID(2)]
+        )
+        #expect(content.sections.first?.entries.map(\.text) == ["Mail - Inbox", "Safari - Apple  (minimised to make room)"])
+    }
 }

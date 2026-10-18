@@ -25,6 +25,19 @@ public enum IconState: Sendable, Equatable {
     }
 }
 
+/// One display in the "Window limit" submenu (UX-17).
+public struct WindowLimitMenuEntry: Sendable, Equatable {
+    public let displayUUID: String
+    public let displayName: String
+    public let limit: Int
+
+    public init(displayUUID: String, displayName: String, limit: Int) {
+        self.displayUUID = displayUUID
+        self.displayName = displayName
+        self.limit = limit
+    }
+}
+
 public struct MenuState: Sendable, Equatable {
     public var icon: IconState
     /// The grey first line of the menu (UX-9).
@@ -34,13 +47,16 @@ public struct MenuState: Sendable, Equatable {
     public var canTileNow: Bool
     /// Leads the menu with "Open Accessibility settings..." and greys window items (UX-5).
     public var needsPermission: Bool
+    public var windowLimits: [WindowLimitMenuEntry]
 
-    public init(icon: IconState, statusLine: String, notFitCount: Int = 0, canTileNow: Bool, needsPermission: Bool = false) {
+    public init(icon: IconState, statusLine: String, notFitCount: Int = 0, canTileNow: Bool, needsPermission: Bool = false,
+                windowLimits: [WindowLimitMenuEntry] = []) {
         self.icon = icon
         self.statusLine = statusLine
         self.notFitCount = notFitCount
         self.canTileNow = canTileNow
         self.needsPermission = needsPermission
+        self.windowLimits = windowLimits
     }
 }
 
@@ -51,6 +67,8 @@ public struct MenuActions {
     public var menuWillOpen: @MainActor () -> Void
     /// The user chose a window in the "Windows" submenu (US-3.4).
     public var raiseWindow: @MainActor (WindowID) -> Void
+    /// The user picked a window limit for a display (US-31.2).
+    public var setWindowLimit: @MainActor (String, Int) -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -62,6 +80,7 @@ public struct MenuActions {
         tileNow: @escaping @MainActor () -> Void,
         menuWillOpen: @escaping @MainActor () -> Void = {},
         raiseWindow: @escaping @MainActor (WindowID) -> Void = { _ in },
+        setWindowLimit: @escaping @MainActor (String, Int) -> Void = { _, _ in },
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -72,6 +91,7 @@ public struct MenuActions {
         self.tileNow = tileNow
         self.menuWillOpen = menuWillOpen
         self.raiseWindow = raiseWindow
+        self.setWindowLimit = setWindowLimit
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces

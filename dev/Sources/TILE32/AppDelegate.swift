@@ -20,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var listedWindows: [WindowID: WindowSnapshot] = [:]
     private var refreshingMenu = false
     private let engine = LayoutEngine()
+    private let limitStore = WindowLimitStore()
+    private lazy var limits = limitStore.load()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -66,11 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.permission = permission
 
         menuBar = MenuBarController(
-            state: Self.menuState(permissionGranted: permission.isGranted),
+            state: menuState(permissionGranted: permission.isGranted),
             actions: MenuActions(
                 tileNow: { Log.layout.info("Tile now chosen; arranging windows arrives in task T-0.24") },
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
                 raiseWindow: { [weak self] id in self?.raise(id) },
+                setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -167,8 +170,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let apps = AppInfo.runningRegularApps().filter { onlyBundleID == nil || $0.bundleID == onlyBundleID }
         let service = SkyLightSpaceService.shared
         let scan = await WindowScan.run(apps: apps, displays: displays, spaceService: service)
+        var limits = self.limits
+        // Test runs may override the limit for every display: `--window-limit 4`.
+        if let index = CommandLine.arguments.firstIndex(of: "--window-limit"), index + 1 < CommandLine.arguments.count,
+           let value = Int(CommandLine.arguments[index + 1]) {
+            for display in displays.displays { limits.set(value, for: display.id) }
+        }
+        let recency = WindowServerList.frontToBack().map { WindowID(UInt64($0)) }
         _ = await engine.tileNow(records: Array(scan.registry.records.values), displays: displays,
-                                 currentSpaces: service.currentSpaces(on: displays))
+                                 currentSpaces: service.currentSpaces(on: displays), limits: limits, recency: recency)
     }
 
     private func runFrameWriteTest(onlyBundleID: String?) {
@@ -189,7 +199,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let apps = AppInfo.runningRegularApps()
         let displays = self.displays?.table ?? DisplayTable(screens: [])
         Task {
-            let result = await WindowMenuLoader.load(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared)
+            let minimised = await engine.minimisedByEngine
+            let result = await WindowMenuLoader.load(apps: apps, displays: displays, spaceService: SkyLightSpaceService.shared,
+                                                     minimisedToMakeRoom: minimised)
             listedWindows = result.windows
             menuBar?.setWindowContent(result.content)
             refreshingMenu = false
@@ -210,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func permissionChanged(_ granted: Bool) {
-        menuBar?.update(Self.menuState(permissionGranted: granted))
+        menuBar?.update(menuState(permissionGranted: granted))
         updateDragLogging(granted: granted)
     }
 
@@ -251,11 +263,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Until the engine exists (T-0.24) nothing is tiled, so a granted permission shows the
     /// paused state and "Tile now" stays grey. Texts follow UX-9.
-    private static func menuState(permissionGranted: Bool) -> MenuState {
-        permissionGranted
-            ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: false)
+    private func menuState(permissionGranted: Bool) -> MenuState {
+        let entries = (displays?.table.displays ?? []).map { display in
+            WindowLimitMenuEntry(displayUUID: display.id.uuid, displayName: display.name, limit: limits.limit(for: display))
+        }
+        return permissionGranted
+            ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: false, windowLimits: entries)
             : MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
-                        canTileNow: false, needsPermission: true)
+                        canTileNow: false, needsPermission: true, windowLimits: entries)
+    }
+
+    /// US-31.2: remembered per display. Applying a new limit to tiled layouts at once is T-1.14.
+    private func setWindowLimit(_ uuid: String, _ value: Int) {
+        limits.set(value, for: DisplayID(uuid: uuid))
+        limitStore.save(limits)
+        Log.layout.info("Window limit for \(uuid, privacy: .public) set to \(value)")
+        menuBar?.update(menuState(permissionGranted: permission?.isGranted ?? false))
     }
 
     private func diagnostics() -> String {
