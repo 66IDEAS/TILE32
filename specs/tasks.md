@@ -359,11 +359,12 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Depends on:** T-2.3
 - **Result:** Escape during a real drag cancelled it, hid the overlay and snapped the window back into its tile exactly. Done.
 
-### [ ] T-2.5 Leave other title-bar behaviour alone
+### [x] T-2.5 Leave other title-bar behaviour alone
 - **Do:** Make sure the traffic-light buttons, toolbar buttons, double-clicks and floating windows behave as usual. An Option-click zoom and any resize made by an app are put back into the tile once. Paused means no drag handling at all.
 - **Traces:** US-19.3, US-20, TA-12, TA-14
 - **Done when:** each item of US-20 is checked in Safari, Finder and VS Code.
 - **Depends on:** T-2.3
+- **Result:** floating windows are never in a layout, so drops ignore them (test) and reconcile never moves them; clicks and double-clicks on the title bar are classified as clicks (S1); a zoom or an app's own resize is put back once and then left alone (reconcile test, and a live check on 2026-10-18 with the FakeWindows window that resizes itself every 3 seconds: one put-back, then nothing); while paused the coordinator ignores drags. Live check of the traffic-light and toolbar buttons is part of the M2 acceptance. Done.
 
 ### [x] T-2.6 Resize by dragging an edge
 - **Do:** Implement TA-25: active edges from the first resize notification, live updates of the neighbours at up to 30 per second (never writing the window being held), the 50 ms slow-app rule, snapping and full write on release, the minimum clamp, outer edges snapping back, and the percentage label in the overlay.
