@@ -278,7 +278,7 @@ Goal: the user arranges windows by dragging them, as in the interactive prototyp
 **Description:** As a user, I want to take back a drag when I change my mind.
 
 **Acceptance criteria:**
-1. Pressing Escape during a drag cancels it, and the window returns to its tile. This criterion applies only if Escape can be detected with the Accessibility permission alone (architecture OQ-1). If not, it is dropped and criterion 2 is the only way to cancel.
+1. Pressing Escape during a drag cancels it, and the window returns to its tile. (Spike S1 confirmed that Escape is detected with the Accessibility permission alone.)
 2. Releasing the mouse when no highlight is shown cancels the drag in the same way.
 3. After a cancel, the layout is exactly as it was before the drag.
 4. Escape is the only key used by TILE32, and only while a drag is in progress. Cancelling also always works with the mouse alone (criterion 2).

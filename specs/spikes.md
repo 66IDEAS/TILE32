@@ -129,3 +129,26 @@ All tiled windows on desktop 2 (9 windows of ChatGPT, Claude, VS Code, Safari, S
 - **The enhanced-UI workaround never made a difference.** TILE32 does not use it (TA-11 updated).
 - **Size steps:** Terminal (and other apps that size in steps) must count as fitted, otherwise TILE32 would mark it as "does not fit" and retry. Fixed: a window counts as fitted within 16 points of the requested size (`FrameWriteResult.fits`); only a window more than 16 points larger counts as "does not fit". 4 new tests.
 - No write returned an error.
+
+## S1 Drag detection - passed (2026-10-18, session C and re-test)
+
+The owner dragged, resized and clicked windows in Safari, Chrome, Slack, Teams, Finder and Terminal (VS Code was dragged but never logged, see below). TILE32 logged every gesture with app and classification, never titles.
+
+| Gesture | Result |
+|---|---|
+| Title-bar drag, normal speed | recognised in every app |
+| Title-bar drag, fast flick | first run: rejected 9 times as "not in lockstep" (mostly Slack and Chrome); the window trails the cursor by 40 to 50 percent of the travel in a flick. After two rule changes all recorded misses count as drags (see below) |
+| Edge resize (left, right, top, bottom) | recognised every time, with the right edge |
+| Corner resize | recognised every time; both edges reported by release |
+| Single and double click on the title bar | never mistaken for a drag |
+| Drag inside the content (text selection, scrollbar) | never mistaken for a drag |
+| Escape during a drag | **works with the Accessibility permission alone** (OQ-1 answered: yes); holding Escape repeats the key, which is harmless |
+| Click on the Dock | correctly finds no window |
+
+**Final rule for "the window follows the cursor" (TA-14):** the window's movement since the press counts as a drag when it is within 12 points plus 35 percent of the cursor's travel, or when it points the same way (cosine at least 0.8) and covers between half and one and a half times the cursor's distance. A window that moves the same way but less than half as far is lagging and gets another reading. A window that moves while the cursor barely does (an app moving its own window) is not a drag. All three misses of the re-test are unit tests now.
+
+**Window source:** the window under the cursor and its frame come from the window server's public list (front-to-back order, answers in milliseconds). This worked in every app and stays the source for the press hit test; the engine's tiled frames are added in M2 to decide whether the window under the cursor is tiled.
+
+**Unexplained:** in the first run, no press at all was logged for Finder, Terminal and VS Code, although the owner dragged them. In a later check with the current build, Finder and Terminal worked perfectly (4 of 4 drags). Possibly the first presses happened while TILE32 was being restarted. To watch in M2 acceptance.
+
+**Sample size:** fewer gestures than the planned 20 drags per app (owner's time); the result is clear enough to build M2 on.

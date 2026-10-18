@@ -80,7 +80,13 @@ public final class MouseDragTracker {
         case .leftMouseDown:
             let point = cursor()
             let ownPID = ProcessInfo.processInfo.processIdentifier
-            let press = WindowServerList.window(at: point, margin: DragStateMachine.edgeMargin, excludingPID: ownPID).map { window in
+            let hit = WindowServerList.window(at: point, margin: DragStateMachine.edgeMargin, excludingPID: ownPID)
+            if let hit {
+                Log.drag.debug("S1 press on w\(hit.number) \(hit.ownerName, privacy: .public) at \(Int(point.x)),\(Int(point.y))")
+            } else {
+                Log.drag.info("S1 press on no window at \(Int(point.x)),\(Int(point.y))")
+            }
+            let press = hit.map { window in
                 DragStateMachine.Press(window: window.number, pid: window.ownerPID, frame: window.bounds, point: point)
             }
             apply(.press(press))

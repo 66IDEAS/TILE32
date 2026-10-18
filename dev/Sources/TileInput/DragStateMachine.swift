@@ -137,8 +137,11 @@ public enum DragStateMachine {
         if difference <= max(lockstepTolerance, lockstepShare * cursorLength) { return .lockstep }
         guard cursorLength > 0, windowLength > 0 else { return .unrelated }
         let cosine = (window.x * cursor.x + window.y * cursor.y) / (cursorLength * windowLength)
-        if cosine >= 0.8 && windowLength < laggingRatio * cursorLength { return .lagging }
-        return .unrelated
+        guard cosine >= 0.8 else { return .unrelated }
+        let ratio = windowLength / cursorLength
+        if ratio < laggingRatio { return .lagging }
+        // Session C re-test: in fast flicks windows trailed by 40 to 50 percent of the travel.
+        return ratio <= 1.5 ? .lockstep : .unrelated
     }
 
     static func changedEdges(from a: CGRect, to b: CGRect) -> Set<Edge> {

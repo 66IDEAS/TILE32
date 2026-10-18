@@ -145,4 +145,18 @@ struct DragStateMachineTests {
         #expect(state == .idle)
         #expect(outcomes == [.pressed, .movedOtherwise(reason: "not in lockstep with the cursor (window -200,0 cursor 200,0)")])
     }
+
+    @Test(arguments: [
+        (CGPoint(x: -260, y: 0), CGPoint(x: -515, y: 0)),
+        (CGPoint(x: 16, y: 245), CGPoint(x: 33, y: 391)),
+        (CGPoint(x: -597, y: -11), CGPoint(x: -990, y: -10)),
+    ])
+    func fastFlicksFromTheReTestCount(window: CGPoint, cursor: CGPoint) {
+        // The three misses of the session C re-test (Slack twice, Chrome once).
+        #expect(DragStateMachine.follow(window: window, cursor: cursor) == .lockstep)
+    }
+
+    @Test func appMovingItsWindowWhileTheCursorBarelyMovesIsUnrelated() {
+        #expect(DragStateMachine.follow(window: CGPoint(x: 400, y: 0), cursor: CGPoint(x: 20, y: 0)) == .unrelated)
+    }
 }
