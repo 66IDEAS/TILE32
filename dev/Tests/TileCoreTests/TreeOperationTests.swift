@@ -253,3 +253,34 @@ struct ReturnHintTests {
         #expect(LayoutTree.flat([A, B]).returnHint(for: E) == nil)
     }
 }
+
+@Suite("Appending with a second row (L3, D-9)")
+struct AppendingRowsTests {
+    private func build(_ count: Int, width: CGFloat) -> LayoutTree {
+        (1...count).reduce(LayoutTree()) { $0.appending(WindowID(UInt64($1)), availableWidth: width) }
+    }
+
+    @Test func twelveWindowsOneByOneOnTheDellBecomeSixByTwo() {
+        let tree = build(12, width: 5108)
+        #expect(shape(tree) == "H(V(1,7),V(2,8),V(3,9),V(4,10),V(5,11),V(6,12))")
+        #expect(approx(topWeights(tree), Array(repeating: 1.0 / 6, count: 6)))
+    }
+
+    @Test func sixWindowsOneByOneOnTheLaptopBecomeThreeByTwo() {
+        #expect(shape(build(6, width: 1716)) == "H(V(1,3),V(2,4),V(5,6))")
+    }
+
+    @Test func wideEnoughStaysOneRow() {
+        #expect(shape(build(5, width: 5108)) == "H(1,2,3,4,5)")
+    }
+
+    @Test func refillAfterTheLimitWentDownAndUpAgain() {
+        // Owner's step 9: limit 3, then 12 again; nine windows come back one by one.
+        var tree = LayoutTree.flat([A, B, C])
+        for id in 10...18 { tree = tree.appending(WindowID(UInt64(id)), availableWidth: 5108) }
+        #expect(tree.windowIDs.count == 12)
+        guard case .split(.horizontal, let children)? = tree.root else { Issue.record("not columns"); return }
+        #expect(children.count == 6)
+        #expect(children.allSatisfy { if case .split(.vertical, let pair) = $0.node { pair.count == 2 } else { false } })
+    }
+}

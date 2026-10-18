@@ -176,6 +176,14 @@ extension AppDelegate {
             )
             self.coordinator = coordinator
             coordinator.trigger("test start")
+            // `--limit-later 8:12` changes the test limit after 8 seconds (owner's step 9).
+            if let later = value(after: "--limit-later")?.split(separator: ":"), later.count == 2,
+               let delay = Double(later[0]), let limit = Int(later[1]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    Self.testLimitOverride = limit
+                    coordinator.trigger("test limit changed to \(limit)")
+                }
+            }
             let seconds = value(after: "--quit-after").flatMap(Double.init) ?? 30
             return run {
                 try? await Task.sleep(for: .seconds(seconds))
@@ -191,10 +199,12 @@ extension AppDelegate {
         return arguments[index + 1]
     }
 
+    static var testLimitOverride: Int?
+
     /// The owner's limits, or `--window-limit N` for every display in test runs.
     private func testLimits() -> WindowLimits {
         var limits = self.limits
-        if let value = value(after: "--window-limit").flatMap(Int.init) {
+        if let value = Self.testLimitOverride ?? value(after: "--window-limit").flatMap(Int.init) {
             for display in displayTable.displays { limits.set(value, for: display.id) }
         }
         return limits

@@ -40,10 +40,30 @@ extension LayoutTree {
     }
 
     /// Adds the window as one more column at the right end of the top level (rule L3).
-    /// It gets 1 / (n + 1), and the existing columns shrink in proportion.
-    public func appending(_ id: WindowID) -> LayoutTree {
+    /// It gets 1 / (n + 1), and the existing columns shrink in proportion. When one more
+    /// column would be narrower than `minimumColumnWidth`, the window fills a second row
+    /// instead: it goes below the leftmost column that holds a single window, so windows
+    /// arriving one by one end up like "Tile now" would arrange them (decision D-9).
+    public func appending(_ id: WindowID, availableWidth: CGFloat = .infinity, minimumColumnWidth: CGFloat = 800) -> LayoutTree {
         guard !contains(id) else { return self }
         guard let root else { return LayoutTree(root: .leaf(id)) }
+
+        let columns: Int
+        if case .split(.horizontal, let children) = root { columns = children.count } else { columns = 1 }
+        if availableWidth / CGFloat(columns + 1) < minimumColumnWidth {
+            switch root {
+            case .leaf:
+                return LayoutTree(root: .split(.vertical, [SplitChild(root, weight: 0.5), SplitChild(.leaf(id), weight: 0.5)]))
+            case .split(.horizontal, var children):
+                if let index = children.firstIndex(where: { if case .leaf = $0.node { true } else { false } }) {
+                    children[index].node = .split(.vertical, [SplitChild(children[index].node, weight: 0.5),
+                                                              SplitChild(.leaf(id), weight: 0.5)])
+                    return LayoutTree(root: .split(.horizontal, children)).normalized()
+                }
+            default:
+                break
+            }
+        }
 
         if case .split(.horizontal, let children) = root {
             let count = Double(children.count)

@@ -308,7 +308,7 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.1 to T-1.11, T-1.14
 - **Result:** 19 reconcile tests with a simulated world cover every M1 story of the engine: new and closed windows, minimise and restore, hidden apps, apps that did not answer, Space switching with 16 desktops and no write to a hidden desktop, moves between desktops, full screen, display disconnect, put-back once, windows that cannot shrink, the window limit (swap, refill, limit changes), Tile now. Coordinator behaviour (coalescing, mouse button, echo suppression, settle time) is checked live with FakeWindows. 162 tests in total. Done 2026-10-18.
 
-### [ ] T-1.13 [owner] M1 acceptance
+### [~] T-1.13 [owner] M1 acceptance
 - **Do:** Go through the M1 checklist on both displays, with several Spaces.
 - **Traces:** US-5 to US-12, US-23, US-29, US-30, US-31
 - **Done when:** all M1 items are ticked, or the failures are written down with a decision.
@@ -319,6 +319,8 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 ## Phase M2 - Drag-to-split and resize
 
 Goal: the user arranges windows by dragging them and sizes them by dragging edges, as in the prototype.
+- **Progress:** owner run on 2026-10-18: steps 1 to 8, 10 and 11 as expected.
+- **Errors found:** step 9 (limit 3, then 12): the returning windows became 12 narrow columns instead of 6 x 2. Two causes: (1) arrivals were always appended as columns; fixed by decision D-9 (`appending` fills a second row below 800 points per column, 4 tests); (2) restoring nine windows took 5.7 seconds and 3 of 12 frames failed, because frames were written during the restore animations; fixed by writing the frame while the window is still minimised and restoring afterwards. Re-run with FakeWindows: 12 windows as 6 x 2, all fitting, no failure. Resolved 2026-10-18.
 
 ### [ ] T-2.1 Drag tracker connected to the engine
 - **Do:** Turn the logging tracker of T-0.21 into the real one: on `Dragging`, ask the engine for a snapshot of the layout under the cursor, compute `dropTarget`, and on release send `applyDrop`, `moveToEmptyDisplay` or `snapBack`. Add the optional element-at-position refinement on the app's AX queue if S1 showed it is needed.

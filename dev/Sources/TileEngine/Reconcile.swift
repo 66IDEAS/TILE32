@@ -135,7 +135,7 @@ extension LayoutEngine {
                 } else if let stored = returnHints[id], stored.key == key, tree.contains(stored.hint.sibling) {
                     tree = tree.splitting(target: stored.hint.sibling, with: id, zone: stored.hint.zone)
                 } else {
-                    tree = tree.appending(id)
+                    tree = tree.appending(id, availableWidth: display.usableArea.width - Self.gap)
                 }
                 returnHints[id] = nil
                 summary.arrived += 1
@@ -154,7 +154,7 @@ extension LayoutEngine {
                   let back = minimisedOrder.last(where: { minimisedKeys[$0] == key }),
                   let snapshot = minimisedSnapshots[back] {
                 toRestore.append((back, snapshot))
-                tree = tree.appending(back)
+                tree = tree.appending(back, availableWidth: display.usableArea.width - Self.gap)
                 forgetMinimised(back)
                 summary.restored += 1
             }
@@ -163,10 +163,6 @@ extension LayoutEngine {
             summary.layouts += 1
         }
 
-        if !toRestore.isEmpty {
-            let failed = await writer.setMinimised(toRestore, false)
-            if !failed.isEmpty { Log.layout.info("Bringing back \(failed.count) windows failed") }
-        }
         let restoredSnapshots = Dictionary(toRestore.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
 
         // Frames: write a window when its tile changed, or when it moved away from its tile
@@ -195,7 +191,14 @@ extension LayoutEngine {
                 batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
             }
         }
+        // Windows that come back get their frame while still minimised, then are restored, so
+        // they animate straight into their tile; writing during the restore animation fails
+        // (found in the owner's step 9 check).
         let written = await apply(batch)
+        if !toRestore.isEmpty {
+            let failed = await writer.setMinimised(toRestore, false)
+            if !failed.isEmpty { Log.layout.info("Bringing back \(failed.count) windows failed") }
+        }
         summary.written = batch.count
         summary.matched = written.matched
         summary.doesNotFit = written.doesNotFit
