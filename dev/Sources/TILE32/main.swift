@@ -1,9 +1,8 @@
-// TILE32 entry point. The menu-bar app and module wiring follow in T-0.10.
+// TILE32 entry point: a menu-bar app with no Dock icon and no main window (US-1, TA-17).
 import AppKit
-import TileGeometry
-import TileLog
 
-Log.ui.info("TILE32 started (scaffold)")
-MainActor.assumeIsolated {
-    _ = DisplayMonitor { _ in }
-}
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()

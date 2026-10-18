@@ -81,24 +81,28 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Traces:** TA-23
 - **Done when:** `log stream --predicate 'subsystem == "com.66ideas.tile32"'` shows messages from a debug build, and none of them contain window titles in a release build.
 - **Depends on:** T-0.1
-- **Progress:** the loggers live in a small extra module `TileLog`, because `TileCore` must not import `os`. Messages from the signed debug build appear in `/usr/bin/log` (in zsh, plain `log` is a shell built-in, so use the full path). Open: the "Debug" submenu, which needs the menu of T-0.10, and the release-build check for titles, which needs the release mode of T-0.2.
+- **Progress:** the loggers live in a small extra module `TileLog`, because `TileCore` must not import `os`. Messages from the signed debug build appear in `/usr/bin/log` (in zsh, plain `log` is a shell built-in, so use the full path). The "Debug" submenu with "Dump layout trees" and "Copy diagnostics" now exists in debug builds (T-0.10). Open: the release-build check for titles, which needs the release mode of T-0.2.
 
-### [ ] T-0.10 Menu-bar shell
+### [x] T-0.10 Menu-bar shell
 - **Do:** Create the status item with the three icon states (`rectangle.split.2x2`, `rectangle.dashed`, `exclamationmark.triangle`, template images), and a menu rebuilt in `menuNeedsUpdate` with the status line, "Tile now", "Windows" (empty for now) and "Quit TILE32". No Dock icon. VoiceOver label "TILE32" with the state as its value.
 - **Traces:** US-1, TA-17, UX-2, UX-3, UX-14
 - **Done when:** launching `TILE32.app` shows only the menu-bar icon, the menu opens, "Quit TILE32" quits, and VoiceOver reads the label and state.
 - **Depends on:** T-0.2, T-0.9
+- **Progress:** built in `TileUI` (`MenuBarController`, `MenuState`) and wired in `AppDelegate`. Checked by Claude: the app runs as a menu-bar agent (macOS type "UIElement", no Dock icon); the status item reports the label "TILE32" and the value "Needs permission" to VoiceOver. "Tile now" stays grey until the engine exists (T-0.24), and the Windows submenu shows "No windows to arrange" until T-0.23. The owner confirmed the icon, the menu, "Copy diagnostics" and "Quit TILE32" on 2026-10-18.
 
-### [ ] T-0.11 Permission flow
+### [x] T-0.11 Permission flow
 - **Do:** Check `AXIsProcessTrustedWithOptions` without prompting. Show the first-run alert with the exact UX-8 wording. "Open System Settings" calls the prompting variant. Show the missing-permission menu (UX-5) with "Open Accessibility settings..." using the settings URL. Poll every 2 seconds, observe `com.apple.accessibility.api`, and switch states without a restart.
 - **Traces:** US-2, TA-8, UX-5, UX-8, UX-9
 - **Done when:** with permission removed, the alert and the warning icon appear; after granting, the icon and status line change within 2 seconds, without a restart.
 - **Depends on:** T-0.10
+- **Progress:** `PermissionMonitor` (polling every 2 seconds plus the distributed notification) and `AccessibilityPermission` in `TileAX`, `PermissionGuide` in `TileUI`, missing-permission menu with "Open Accessibility settings...". Checked by Claude: on launch without permission the alert shows the exact UX-8 text and the icon reports "Needs permission". The owner granted the permission on 2026-10-18; the icon and status line changed without a restart. Note: the alert already mentions "Resume tiling", which arrives in T-1.1; until then the granted state shows "Tiling paused".
+- **Resolved:** "Quit TILE32" was rechecked by the owner and ends the app. The earlier instance had most likely not been quit during the first check.
 
-### [ ] T-0.12 [owner] Grant the permission and check it survives rebuilds (spike S5)
+### [x] T-0.12 [owner] Grant the permission and check it survives rebuilds (spike S5)
 - **Do:** The owner switches on TILE32 under Privacy & Security > Accessibility. Claude rebuilds and relaunches three times.
 - **Traces:** S5, TA-22, C-1
 - **Done when:** the app stays trusted after three rebuilds, and the result is in `specs/spikes.md`.
+- **Result:** passed on 2026-10-18; three differently signed builds stayed trusted (`specs/spikes.md`, S5). `build-app.sh` now stamps every build with its own build number.
 - **Depends on:** T-0.11
 
 ### [ ] T-0.13 TileSpaces: Space service
