@@ -38,6 +38,17 @@ public struct WindowLimitMenuEntry: Sendable, Equatable {
     }
 }
 
+/// An app in the per-app controls (UX-7).
+public struct MenuApp: Sendable, Equatable {
+    public let bundleID: String
+    public let name: String
+
+    public init(bundleID: String, name: String) {
+        self.bundleID = bundleID
+        self.name = name
+    }
+}
+
 public struct MenuState: Sendable, Equatable {
     public var icon: IconState
     /// The grey first line of the menu (UX-9).
@@ -52,6 +63,9 @@ public struct MenuState: Sendable, Equatable {
     public var canUntile: Bool
     /// Shows "Pause tiling" while running and "Resume tiling" while paused (UX-3, UX-4).
     public var isRunning: Bool
+    /// The app in front when the menu opened, for "Don't tile <app>" (UX-7).
+    public var frontApp: MenuApp?
+    public var excludedApps: [MenuApp] = []
 
     public init(icon: IconState, statusLine: String, notFitCount: Int = 0, canTileNow: Bool, needsPermission: Bool = false,
                 windowLimits: [WindowLimitMenuEntry] = [], canUntile: Bool = false, isRunning: Bool = false) {
@@ -78,6 +92,8 @@ public struct MenuActions {
     public var setWindowLimit: @MainActor (String, Int) -> Void
     public var untile: @MainActor () -> Void
     public var togglePause: @MainActor () -> Void
+    /// Excludes the app, or tiles it again when it is already excluded (US-22).
+    public var toggleExclude: @MainActor (MenuApp) -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -93,6 +109,7 @@ public struct MenuActions {
         setWindowLimit: @escaping @MainActor (String, Int) -> Void = { _, _ in },
         untile: @escaping @MainActor () -> Void = {},
         togglePause: @escaping @MainActor () -> Void = {},
+        toggleExclude: @escaping @MainActor (MenuApp) -> Void = { _ in },
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -107,6 +124,7 @@ public struct MenuActions {
         self.setWindowLimit = setWindowLimit
         self.untile = untile
         self.togglePause = togglePause
+        self.toggleExclude = toggleExclude
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces

@@ -405,11 +405,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Done when:** the FakeWindows dialog, sheet and tool window never take a tile, and their reasons are shown correctly.
 - **Depends on:** T-1.12
 
-### [ ] T-3.2 Exclude apps
+### [~] T-3.2 Exclude apps
 - **Do:** Add "Don't tile <app>" / "Tile <app> again" / "Don't tile an app", and the "Excluded apps" submenu with its header and empty state. Store bundle identifiers in `UserDefaults`.
 - **Traces:** US-22, TA-10, TA-19, UX-7
 - **Done when:** excluding Zoom floats its windows at once and the rest re-flow, removing it brings them back, and the list survives a restart.
 - **Depends on:** T-3.1
+- **Progress:** `ExcludedAppsStore` (UserDefaults, most recently added last, test), "Don't tile <app>" / "Tile <app> again" / "Don't tile an app" for the app in front when the menu is built, "Excluded apps" submenu with its header and empty state, the list passed to every reconcile and to "Tile now"; reconcile test: an excluded app's window floats where it is, the others close the gap, including it again brings it back. Waiting for the owner check (for example with Zoom).
 
 ### [~] T-3.3 Untile
 - **Do:** Restore the recorded original frames, clamp them to visible display areas, restore windows on hidden Spaces when their Space is next shown, then pause. "Untile" is available while running and paused, and grey only when there is nothing to restore.

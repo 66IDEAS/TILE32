@@ -33,6 +33,8 @@ public final class TilingCoordinator {
     private let displays: @MainActor () -> DisplayTable
     private let limits: @MainActor () -> WindowLimits
     private let onlyBundleIDs: Set<String>?
+    /// Apps the user excluded (US-22); read on every run so changes apply at once.
+    public var excludedBundleIDs: @MainActor () -> Set<String> = { [] }
     private let onChange: @MainActor () -> Void
 
     private var events: AXEventSource?
@@ -180,7 +182,7 @@ public final class TilingCoordinator {
             runAgain = false
             let observation = await observe()
             lastObservation = observation
-            let summary = await engine.reconcile(observation, limits: limits())
+            let summary = await engine.reconcile(observation, limits: limits(), excludedBundleIDs: excludedBundleIDs())
             if summary.changedAnything { lastWrite = .now }
             if summary.minimised > 0 || summary.restored > 0 || summary.arrived > 0 { lastAnimation = .now }
             lastSummary = summary
@@ -283,7 +285,7 @@ public final class TilingCoordinator {
 
     /// "Tile now" while running: arranges afresh and keeps tiling (US-4.6).
     public func tileNow() async -> ReconcileSummary {
-        let summary = await engine.reconcile(await observe(), limits: limits(), rebuild: true)
+        let summary = await engine.reconcile(await observe(), limits: limits(), excludedBundleIDs: excludedBundleIDs(), rebuild: true)
         lastWrite = .now
         lastSummary = summary
         onChange()

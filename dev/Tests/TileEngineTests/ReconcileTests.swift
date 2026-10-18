@@ -630,3 +630,22 @@ private final class SlowWriter: FrameWriting, @unchecked Sendable {
         await world.setMinimised(windows, minimised)
     }
 }
+
+@Suite("Excluding apps in reconcile (US-22)")
+struct ExcludeReconcileTests {
+    @Test func excludedAppLeavesAndComesBack() async {
+        let world = World()
+        world.add(1, x: 100, pid: 100); world.add(2, x: 1500, pid: 200); world.add(3, x: 3000, pid: 100)
+        world.update(2) { $0.bundleID = "us.zoom.xos" }
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        #expect(ids(await engine.trees[key2]) == [1, 2, 3])
+        let zoomFrame = world.window(2)!.frame
+        let excluded = await engine.reconcile(world.observe(), excludedBundleIDs: ["us.zoom.xos"])
+        #expect(excluded.departed == 1)
+        #expect(ids(await engine.trees[key2]) == [1, 3])
+        #expect(world.window(2)!.frame == zoomFrame)          // floats where it is (US-22.2)
+        _ = await engine.reconcile(world.observe())
+        #expect(ids(await engine.trees[key2]) == [1, 3, 2])    // joins again (US-22.3)
+    }
+}

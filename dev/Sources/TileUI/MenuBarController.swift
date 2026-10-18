@@ -84,6 +84,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(equal)
         menu.addItem(windowsItem())
         menu.addItem(.separator())
+        for item in perAppItems() { menu.addItem(item) }
         menu.addItem(windowLimitItem())
         menu.addItem(.separator())
         let pause = ActionMenuItem(title: state.isRunning ? "Pause tiling" : "Resume tiling") { [actions] in actions.togglePause() }
@@ -132,6 +133,46 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             windowsSubmenu.addItem(.separator())
             windowsSubmenu.addItem(disabledItem("\(count) \(count == 1 ? "window" : "windows") on other Spaces"))
         }
+    }
+
+    /// "Don't tile <app>" and the "Excluded apps" submenu (UX-7).
+    private func perAppItems() -> [NSMenuItem] {
+        let toggle: NSMenuItem
+        if let app = Self.frontmostApp() ?? state.frontApp {
+            let excluded = state.excludedApps.contains { $0.bundleID == app.bundleID }
+            toggle = ActionMenuItem(title: excluded ? "Tile \(app.name) again" : "Don't tile \(app.name)") { [actions] in
+                actions.toggleExclude(app)
+            }
+            toggle.isEnabled = !state.needsPermission
+        } else {
+            toggle = disabledItem("Don't tile an app")
+        }
+
+        let listItem = NSMenuItem(title: "Excluded apps", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        if state.excludedApps.isEmpty {
+            submenu.addItem(disabledItem("No excluded apps"))
+        } else {
+            submenu.addItem(NSMenuItem.sectionHeader(title: "Click an app to tile it again"))
+            for app in state.excludedApps {
+                let entry = ActionMenuItem(title: app.name) { [actions] in actions.toggleExclude(app) }
+                entry.indentationLevel = 1
+                submenu.addItem(entry)
+            }
+        }
+        listItem.submenu = submenu
+        listItem.isEnabled = !state.needsPermission
+        return [toggle, listItem]
+    }
+
+    /// The app the user was using: the menu of an agent app does not activate it, so the
+    /// frontmost app is still the user's app while the menu is built (UX-7).
+    static func frontmostApp() -> MenuApp? {
+        guard let app = NSWorkspace.shared.frontmostApplication, app.activationPolicy == .regular,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let bundleID = app.bundleIdentifier else { return nil }
+        return MenuApp(bundleID: bundleID, name: app.localizedName ?? bundleID)
     }
 
     /// One group per display with the choices 2 to 16 (UX-17).

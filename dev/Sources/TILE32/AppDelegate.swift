@@ -29,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let limitStore = WindowLimitStore()
     lazy var limits = limitStore.load()
     let runStateStore = RunStateStore()
+    let excludedStore = ExcludedAppsStore()
+    /// The app in front when the menu last opened (UX-7).
+    var frontApp: MenuApp?
 
     var displayTable: DisplayTable { displays?.table ?? DisplayTable(screens: []) }
 
@@ -51,6 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             limits: { [weak self] in self?.limits ?? WindowLimits() },
             onChange: { [weak self] in self?.updateMenu() }
         )
+        coordinator?.excludedBundleIDs = { [weak self] in
+            Set(self?.excludedStore.load().map(\.bundleID) ?? [])
+        }
 
         menuBar = MenuBarController(
             state: baseMenuState(),
@@ -65,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
                 untile: { [weak self] in self?.untileFromMenu() },
                 togglePause: { [weak self] in self?.togglePause() },
+                toggleExclude: { [weak self] app in self?.toggleExclude(app) },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -180,6 +187,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowLimitMenuEntry(displayUUID: display.id.uuid, displayName: display.name, limit: limits.limit(for: display))
         }
         let state = coordinator?.state ?? .noPermission
+        let excluded = excludedStore.load().map { MenuApp(bundleID: $0.bundleID, name: $0.name) }
+        var menuState = baseMenuStateForRunState(state, entries: entries)
+        menuState.frontApp = frontApp
+        menuState.excludedApps = excluded
+        return menuState
+    }
+
+    private func baseMenuStateForRunState(_ state: TilingCoordinator.RunState, entries: [WindowLimitMenuEntry]) -> MenuState {
         switch state {
         case .noPermission:
             return MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
@@ -248,8 +263,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenu()
     }
 
+    /// US-22: excluded windows float at once and the others re-flow; including them again
+    /// brings them back into the layout.
+    private func toggleExclude(_ app: MenuApp) {
+        excludedStore.toggle(ExcludedApp(bundleID: app.bundleID, name: app.name))
+        Log.layout.info("Exclude list changed for \(app.bundleID, privacy: .public)")
+        coordinator?.trigger("exclude list changed")
+        updateMenu()
+    }
+
     /// Reads the windows again whenever the menu opens; the submenu updates while open (US-3.3).
     func refreshWindowMenu() {
+        // The menu of an agent app does not activate it, so this is the app the user was using.
+        if let app = NSWorkspace.shared.frontmostApplication, app.activationPolicy == .regular,
+           let bundleID = app.bundleIdentifier, app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            frontApp = MenuApp(bundleID: bundleID, name: app.localizedName ?? bundleID)
+        } else {
+            frontApp = nil
+        }
         guard AccessibilityPermission.isGranted, !refreshingMenu else { return }
         refreshingMenu = true
         let apps = AppInfo.runningRegularApps()
