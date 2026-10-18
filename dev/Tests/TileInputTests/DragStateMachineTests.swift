@@ -82,7 +82,7 @@ struct DragStateMachineTests {
             .frameRead(frame.offsetBy(dx: 300, dy: 0), cursor: CGPoint(x: 1210, y: 110)),
         ])
         #expect(state == .idle)
-        #expect(outcomes == [.pressed, .movedOtherwise(reason: "not in lockstep with the cursor")])
+        #expect(outcomes == [.pressed, .movedOtherwise(reason: "not in lockstep with the cursor (window 300,0 cursor 10,0)")])
     }
 
     @Test func lockstepMoveBelowTheBandIsReported() {
@@ -115,5 +115,34 @@ struct DragStateMachineTests {
     @Test func resetAlwaysReturnsToIdle() {
         let (state, _) = run([.press(press(at: CGPoint(x: 1200, y: 110))), .reset])
         #expect(state == .idle)
+    }
+
+    @Test func fastDragWithTheWindowTrailingStillCounts() {
+        // Session C: during a fast drag the window trails the cursor by a frame or two.
+        let (_, outcomes) = run([
+            .press(press(at: CGPoint(x: 1200, y: 110))),
+            .frameRead(frame.offsetBy(dx: 260, dy: 30), cursor: CGPoint(x: 1500, y: 150)),
+        ])
+        #expect(outcomes == [.pressed, .startedDrag])
+    }
+
+    @Test func laggingWindowWaitsForTheNextReading() {
+        // An Electron window that has only just started to follow.
+        let (state, outcomes) = run([
+            .press(press(at: CGPoint(x: 1200, y: 110))),
+            .frameRead(frame.offsetBy(dx: 40, dy: 0), cursor: CGPoint(x: 1400, y: 110)),
+            .frameRead(frame.offsetBy(dx: 390, dy: 0), cursor: CGPoint(x: 1600, y: 110)),
+        ])
+        #expect(outcomes == [.pressed, .startedDrag])
+        if case .dragging = state {} else { Issue.record("expected dragging") }
+    }
+
+    @Test func windowMovingTheOtherWayIsNotADrag() {
+        let (state, outcomes) = run([
+            .press(press(at: CGPoint(x: 1200, y: 110))),
+            .frameRead(frame.offsetBy(dx: -200, dy: 0), cursor: CGPoint(x: 1400, y: 110)),
+        ])
+        #expect(state == .idle)
+        #expect(outcomes == [.pressed, .movedOtherwise(reason: "not in lockstep with the cursor (window -200,0 cursor 200,0)")])
     }
 }

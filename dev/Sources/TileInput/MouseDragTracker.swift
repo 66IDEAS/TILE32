@@ -14,6 +14,7 @@ public final class MouseDragTracker {
     private var state = DragStateMachine.State.idle
     private var mouseMonitor: Any?
     private var keyMonitor: Any?
+    private var spaceObserver: NSObjectProtocol?
     private let displays: @MainActor () -> DisplayTable
     private let describe: @MainActor (CGWindowID, pid_t) async -> String
     private var lastRead = ContinuousClock.now
@@ -45,14 +46,27 @@ public final class MouseDragTracker {
                 self.apply(.escape)
             }
         }
+        // A desktop switch while the button is down ends the gesture without a drop: the user is
+        // carrying the window to another desktop, which US-29 handles (session A, TA-14).
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.state != .idle else { return }
+                Log.drag.info("S1 gesture ended by a desktop switch")
+                self.apply(.reset)
+            }
+        }
         Log.drag.info("S1 drag logging started (keyboard monitor \(self.keyMonitor == nil ? "unavailable" : "installed", privacy: .public))")
     }
 
     public func stop() {
         if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
         mouseMonitor = nil
         keyMonitor = nil
+        spaceObserver = nil
         apply(.reset)
         Log.drag.info("S1 drag logging stopped")
     }

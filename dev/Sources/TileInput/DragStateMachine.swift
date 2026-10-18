@@ -10,8 +10,14 @@ public enum DragStateMachine {
     public static let edgeMargin: CGFloat = 6
     /// Cursor travel before a press counts as a drag attempt.
     public static let travelThreshold: CGFloat = 4
-    /// How closely the window must follow the cursor to count as a move by the user.
-    public static let lockstepTolerance: CGFloat = 6
+    /// How closely the window must follow the cursor to count as a move by the user: an
+    /// absolute floor, plus a share of the cursor's travel, because during a fast drag the
+    /// window trails the cursor by a frame or two (session C: Slack, Chrome).
+    public static let lockstepTolerance: CGFloat = 12
+    public static let lockstepShare: CGFloat = 0.35
+    /// A window that moved in the cursor's direction but less than half as far is lagging:
+    /// the machine waits for the next reading instead of deciding.
+    public static let laggingRatio: CGFloat = 0.5
     /// Frame differences below this are noise.
     public static let frameTolerance: CGFloat = 2
 
@@ -89,13 +95,17 @@ public enum DragStateMachine {
             }
             let windowDelta = CGPoint(x: frame.minX - press.frame.minX, y: frame.minY - press.frame.minY)
             let cursorDelta = CGPoint(x: cursor.x - press.point.x, y: cursor.y - press.point.y)
-            let lockstep = abs(windowDelta.x - cursorDelta.x) <= lockstepTolerance
-                && abs(windowDelta.y - cursorDelta.y) <= lockstepTolerance
-            if lockstep && press.inTitleBand {
+            switch follow(window: windowDelta, cursor: cursorDelta) {
+            case .lockstep where press.inTitleBand:
                 return (.dragging(press, cancelled: false), .startedDrag)
+            case .lagging:
+                return (state, .none)
+            case .lockstep:
+                return (.idle, .movedOtherwise(reason: "outside the title band"))
+            case .unrelated:
+                let detail = "window \(Int(windowDelta.x)),\(Int(windowDelta.y)) cursor \(Int(cursorDelta.x)),\(Int(cursorDelta.y))"
+                return (.idle, .movedOtherwise(reason: "not in lockstep with the cursor (\(detail))"))
             }
-            let reason = lockstep ? "outside the title band" : "not in lockstep with the cursor"
-            return (.idle, .movedOtherwise(reason: reason))
         case (.pressed, .release):
             return (.idle, .click)
         case (.pressed, _):
@@ -115,6 +125,20 @@ public enum DragStateMachine {
         case (.resizing, _):
             return (state, .none)
         }
+    }
+
+    enum Follow: Equatable { case lockstep, lagging, unrelated }
+
+    /// Whether a window's movement follows the cursor's movement since the press.
+    static func follow(window: CGPoint, cursor: CGPoint) -> Follow {
+        let cursorLength = hypot(cursor.x, cursor.y)
+        let windowLength = hypot(window.x, window.y)
+        let difference = hypot(window.x - cursor.x, window.y - cursor.y)
+        if difference <= max(lockstepTolerance, lockstepShare * cursorLength) { return .lockstep }
+        guard cursorLength > 0, windowLength > 0 else { return .unrelated }
+        let cosine = (window.x * cursor.x + window.y * cursor.y) / (cursorLength * windowLength)
+        if cosine >= 0.8 && windowLength < laggingRatio * cursorLength { return .lagging }
+        return .unrelated
     }
 
     static func changedEdges(from a: CGRect, to b: CGRect) -> Set<Edge> {
