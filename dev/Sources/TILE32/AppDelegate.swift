@@ -100,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar = MenuBarController(
             state: menuState(permissionGranted: permission.isGranted),
             actions: MenuActions(
-                tileNow: { Log.layout.info("Tile now chosen; arranging windows arrives in task T-0.24") },
+                tileNow: { [weak self] in self?.tileNowFromMenu() },
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
                 raiseWindow: { [weak self] id in self?.raise(id) },
                 setWindowLimit: { [weak self] uuid, value in self?.setWindowLimit(uuid, value) },
@@ -305,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WindowLimitMenuEntry(displayUUID: display.id.uuid, displayName: display.name, limit: limits.limit(for: display))
         }
         return permissionGranted
-            ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: false, windowLimits: entries)
+            ? MenuState(icon: .paused, statusLine: "Tiling paused", canTileNow: true, windowLimits: entries)
             : MenuState(icon: .warning, statusLine: "TILE32 needs permission to move windows",
                         canTileNow: false, needsPermission: true, windowLimits: entries)
     }
@@ -344,6 +344,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? await Task.sleep(for: .milliseconds(500))
         }
         Log.spaces.info("S3 hidden write: the window was not moved within 90 s")
+    }
+
+    /// "Tile now" from the menu (US-4, US-31): one arrangement of the shown desktops. Automatic
+    /// tiling follows in M1, so the icon stays in the paused state afterwards.
+    private func tileNowFromMenu() {
+        Task {
+            await tileNow(onlyBundleID: nil)
+            await refreshStatusAfterTiling()
+        }
+    }
+
+    private func refreshStatusAfterTiling() async {
+        var state = menuState(permissionGranted: permission?.isGranted ?? false)
+        let trees = await engine.trees
+        let tiled = trees.values.reduce(0) { $0 + $1.windowIDs.count }
+        let displaysUsed = Set(trees.compactMap { $0.value.isEmpty ? nil : $0.key.display }).count
+        let minimised = await engine.minimisedByEngine.count
+        let notFitting = await engine.doesNotFit.count
+        var line = "Tiling \(tiled) \(tiled == 1 ? "window" : "windows") on \(displaysUsed) \(displaysUsed == 1 ? "display" : "displays")"
+        if minimised > 0 { line += " - \(minimised) minimised to make room" }
+        if notFitting > 0 { line += " - \(notFitting) \(notFitting == 1 ? "does" : "do") not fit" }
+        state.statusLine = line
+        state.notFitCount = notFitting
+        state.canUntile = await engine.canUntile
+        menuBar?.update(state)
     }
 
     /// "Untile" (US-24): restores every window and shows it in the status line.
