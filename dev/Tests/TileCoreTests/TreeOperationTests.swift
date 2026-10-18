@@ -195,3 +195,34 @@ struct ReplacingTests {
         #expect(tree.replacing(A, with: A) == tree)
     }
 }
+
+@Suite("Default arrangement (L2, D-8)")
+struct ArrangedTests {
+    private func ids(_ n: Int) -> [WindowID] { (1...n).map { WindowID(UInt64($0)) } }
+
+    @Test func twelveWindowsOnTheDellBecomeTwoRowsOfSix() {
+        let tree = LayoutTree.arranged(ids(12), availableWidth: 5108)
+        #expect(shape(tree) == "H(V(1,7),V(2,8),V(3,9),V(4,10),V(5,11),V(6,12))")
+        #expect(approx(topWeights(tree), Array(repeating: 1.0 / 6, count: 6)))
+    }
+
+    @Test func oddCountLeavesTheLastColumnFullHeight() {
+        #expect(shape(LayoutTree.arranged(ids(11), availableWidth: 5108)) == "H(V(1,7),V(2,8),V(3,9),V(4,10),V(5,11),6)")
+    }
+
+    @Test func wideEnoughStaysColumns() {
+        // 5 windows on the Dell: 1021 points each.
+        #expect(shape(LayoutTree.arranged(ids(5), availableWidth: 5108)) == "H(1,2,3,4,5)")
+        // 2 windows on the laptop: 858 points each.
+        #expect(shape(LayoutTree.arranged(ids(2), availableWidth: 1716)) == "H(1,2)")
+    }
+
+    @Test func sixWindowsOnTheLaptopBecomeThreeColumnsInTwoRows() {
+        #expect(shape(LayoutTree.arranged(ids(6), availableWidth: 1716)) == "H(V(1,4),V(2,5),V(3,6))")
+    }
+
+    @Test func singleAndNoWindow() {
+        #expect(LayoutTree.arranged(ids(1), availableWidth: 100).root == leaf(A))
+        #expect(LayoutTree.arranged([], availableWidth: 5108).isEmpty)
+    }
+}

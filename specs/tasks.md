@@ -199,11 +199,13 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** `WindowLimits` and `WindowLimitStore` (defaults 12 and 6 by display width, 2 to 16, stored per display UUID), `LayoutTree.replacing`, `WindowServerList.frontToBack` as the starting order of use, "Tile now" with limit and order, minimising through `WindowActions.setMinimised`, `minimisedByEngine` in the engine, "Window limit" submenu, "(minimised to make room)" entries in the Windows submenu. 8 new tests (113 in total). Real check on 2026-10-18 with FakeWindows only and `--window-limit 4`: the four frontmost test windows were tiled, the other two minimised, the control window untouched. The status line count arrives with the running states in T-1.1. Done 2026-10-18.
 - **Depends on:** T-0.24
 
-### [ ] T-0.25 [owner] M0 acceptance
+### [~] T-0.25 [owner] M0 acceptance
 - **Do:** Go through the M0 checklist at the end of this file on both displays.
 - **Traces:** US-1 to US-4
 - **Done when:** all M0 items are ticked, or the failures are written down with a decision.
 - **Depends on:** T-0.1 to T-0.24, T-0.26
+- **Progress:** first run on 2026-10-18. Windows submenu, Window limit and Untile fine.
+- **Errors found:** "Tile now" made 12 columns of about 420 points on the Dell; 6 of 12 windows could not shrink that far, overlapped their neighbours, and the icon showed the "does not fit" count 6. Decision D-8: two rows when columns would be narrower than 800 points (`LayoutTree.arranged`, 5 tests). To recheck with the owner.
 
 ---
 
@@ -438,7 +440,7 @@ To be copied into `specs/review.md` when a milestone is reviewed. Run on both di
 - [ ] Only the Accessibility permission is ever requested (US-2.5).
 - [ ] The Windows submenu lists the windows of the shown Spaces by display, with floating windows separate (US-3.1, US-3.2).
 - [ ] Choosing a window in the submenu brings it to the front (US-3.4).
-- [ ] "Tile now" arranges equal columns on each display without moving windows between displays (US-4.1, US-4.2).
+- [ ] "Tile now" arranges equal columns, or two rows when columns would be narrower than 800 points, without moving windows between displays (US-4.1, US-4.2, L2).
 - [ ] After "Tile now", no two tiled windows overlap and the gap is even (US-4.3, L7).
 - [ ] Floating and full-screen windows are not moved (US-4.5).
 - [ ] With more windows than the limit, "Tile now" tiles the most recent ones and minimises the rest; the limit can be changed per display and is remembered (US-31.1 to US-31.3).

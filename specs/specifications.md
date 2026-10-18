@@ -36,7 +36,7 @@ The name comes from the 32:9 aspect ratio of the user's ultrawide display (5120x
 These rules define how a layout behaves. They match the interactive reference prototype (`prototype/index.html`, mode 2, drag-to-split).
 
 - **L1. Shape.** A layout is a set of nested splits. Each tile holds exactly one window. Every split divides its space among its parts by proportions that add up to 100 percent. Proportions belong to the tiles, not to the windows: when two windows swap places, each takes the other's size.
-- **L2. Default layout.** When a layout has several windows and no arrangement yet, they are placed side by side as equal columns.
+- **L2. Default layout.** When a layout has several windows and no arrangement yet, they are placed side by side as equal columns. If equal columns would be narrower than 800 points, the windows are placed in two rows of equal columns instead: the left half of the windows in the top row, the rest below, and an odd window out takes the full height of the last column. Example: 12 windows on the Dell become 6 columns in 2 rows of about 850 x 670 points (decision D-8).
 - **L3. New window.** A newly opened tiled window is added as one more column at the right end of the layout's top level. It gets an equal share, 1 / (number of columns), and the existing columns shrink in proportion. Example: columns at 50, 25 and 25 percent plus a new window become 37.5, 18.75, 18.75 and 25 percent.
 - **L4. Closing.** When a window closes, its tile disappears and its neighbours in the same split grow in proportion to fill the space. Example: 50, 25 and 25 percent, then the 50 percent window closes, gives 50 and 50 percent.
 - **L5. Tidying.** A split that ends up with a single window is removed. Two splits of the same direction nested inside each other are merged into one, and every window keeps its size on screen. Example: A, B and C side by side at a third each, then D dropped on the right of B, gives A, B, D, C at 33, 17, 17 and 33 percent, because D takes half of B's tile.
@@ -94,7 +94,7 @@ Goal: prove that TILE32 can see and arrange windows of other apps.
 **Description:** As a user, I want one menu command that arranges all my windows, so that I can see TILE32 work before any automatic behaviour is switched on.
 
 **Acceptance criteria:**
-1. Choosing "Tile now" places the tiled windows of each display side by side as equal columns on that display (layout rule L2).
+1. Choosing "Tile now" arranges the tiled windows of each display by layout rule L2: equal columns, or two rows of columns when columns would be narrower than 800 points.
 2. Windows are placed on the display where they currently are. No window moves to another display.
 3. After the command, no two tiled windows overlap.
 4. Choosing "Tile now" again re-arranges the windows into equal columns again.
@@ -461,6 +461,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 | D-5 | TILE32 starts paused on the first run (US-23.5). | 2026-10-18 |
 | D-6 | App identifier `com.66ideas.tile32` (N-12). | 2026-10-18 |
 | D-7 | Window limit per display, configurable, default 12 on the Dell U4924DW and 6 on the laptop. Extra windows are minimised and swapped in when used (US-31, rule L9). Replaces former Q-3. | 2026-10-18 |
+| D-8 | "Tile now" uses two rows when equal columns would be narrower than 800 points (rule L2). Found in the M0 acceptance: 12 columns on the Dell were 420 points wide, and 6 of 12 windows could not shrink that far. | 2026-10-18 |
 
 ## 10. Open questions
 

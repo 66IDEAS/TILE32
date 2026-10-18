@@ -142,7 +142,7 @@ public actor LayoutEngine {
             let members = Array(byUse.prefix(limit))
             toMinimise += byUse.dropFirst(limit).map { ($0.id, $0.snapshot) }
             let ordered = members.sorted { ($0.snapshot.frame?.minX ?? 0, $0.id.raw) < ($1.snapshot.frame?.minX ?? 0, $1.id.raw) }
-            let tree = LayoutTree.flat(ordered.map(\.id))
+            let tree = LayoutTree.arranged(ordered.map(\.id), availableWidth: display.usableArea.width - Self.gap)
             trees[key] = tree
             let frames = tree.frames(in: display.usableArea, gap: Self.gap)
             for record in ordered {

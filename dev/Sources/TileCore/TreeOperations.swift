@@ -1,5 +1,6 @@
 // Tree operations (architecture TA-4), ported from the prototype's `without`, `addWin`,
 // `swapIds`, `applyDrop` and `repl`, extended with weights. All return a new tree.
+import CoreGraphics
 import Foundation
 
 extension LayoutTree {
@@ -12,6 +13,24 @@ extension LayoutTree {
             let weight = 1.0 / Double(ids.count)
             return LayoutTree(root: .split(.horizontal, ids.map { SplitChild(.leaf($0), weight: weight) }))
         }
+    }
+
+    /// The default arrangement (rule L2): equal columns, or two rows of columns when equal
+    /// columns would be narrower than `minimumColumnWidth` (decision D-8). With two rows the
+    /// first half of the list fills the top row and the rest the bottom row; an odd window out
+    /// takes the full height of the last column.
+    public static func arranged(_ ids: [WindowID], availableWidth: CGFloat, minimumColumnWidth: CGFloat = 800) -> LayoutTree {
+        guard ids.count > 1, availableWidth / CGFloat(ids.count) < minimumColumnWidth else { return flat(ids) }
+        let columns = (ids.count + 1) / 2
+        let top = Array(ids.prefix(columns))
+        let bottom = Array(ids.dropFirst(columns))
+        let weight = 1.0 / Double(columns)
+        let children = top.enumerated().map { index, id -> SplitChild in
+            guard index < bottom.count else { return SplitChild(.leaf(id), weight: weight) }
+            return SplitChild(.split(.vertical, [SplitChild(.leaf(id), weight: 0.5), SplitChild(.leaf(bottom[index]), weight: 0.5)]),
+                              weight: weight)
+        }
+        return LayoutTree(root: .split(.horizontal, children))
     }
 
     /// Removes the window. Its siblings grow in proportion (rule L4).
