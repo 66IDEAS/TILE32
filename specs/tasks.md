@@ -105,10 +105,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** passed on 2026-10-18; three differently signed builds stayed trusted (`specs/spikes.md`, S5). `build-app.sh` now stamps every build with its own build number.
 - **Depends on:** T-0.11
 
-### [ ] T-0.13 TileSpaces: Space service
+### [x] T-0.13 TileSpaces: Space service
 - **Do:** Define the `SpaceService` protocol and `SpaceInfo`. Implement the SkyLight version that resolves exactly the four functions of TA-26 with `dlsym` at start (`SLS` names first, then `CGS` names), reads the display-to-Space table, the Spaces of a list of windows, and the window number of an AX element. Set `isAvailable` to false if any function is missing. Add a fake for tests. Log the macOS version and which functions were found.
 - **Traces:** TA-26, TA-20, C-5, US-12.7, constitution technical rule 1
 - **Done when:** a debug build logs all four functions as found, prints the current Space of each display, and the fake is usable in `TileEngineTests`.
+- **Result:** on macOS 27.0.1 (26A434) all four functions were found under their SkyLight names (`SLSMainConnectionID`, `SLSCopyManagedDisplaySpaces`, `SLSCopySpacesForWindows`, `_AXUIElementGetWindow`). The log shows the current Space of both displays. `FakeSpaceService` lives in `TileSpaces` so engine tests can use it; 6 parser and mapping tests in the new `TileSpacesTests` target. Done 2026-10-18.
 - **Depends on:** T-0.8, T-0.9
 
 ### [ ] T-0.14 TileAX: access layer and window registry

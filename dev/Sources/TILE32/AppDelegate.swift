@@ -3,6 +3,7 @@ import AppKit
 import TileAX
 import TileGeometry
 import TileLog
+import TileSpaces
 import TileUI
 
 @MainActor
@@ -10,12 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var displays: DisplayMonitor?
     private var permission: PermissionMonitor?
+    private var spaces: SpaceMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         Log.ui.info("TILE32 \(version, privacy: .public) started")
 
         displays = DisplayMonitor { _ in }
+        startSpaceMonitor()
         let permission = PermissionMonitor { [weak self] granted in self?.permissionChanged(granted) }
         self.permission = permission
 
@@ -43,6 +46,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Logs which undocumented Space functions were found, then the Space of each display (S6).
+    private func startSpaceMonitor() {
+        let service = SkyLightSpaceService.shared
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        Log.spaces.info("macOS \(osVersion, privacy: .public); Space functions available: \(service.isAvailable)")
+        for key in ["MainConnectionID", "CopyManagedDisplaySpaces", "CopySpacesForWindows", "AXUIElementGetWindow"] {
+            Log.spaces.info("  \(key, privacy: .public): \(service.resolvedFunctions[key] ?? "missing", privacy: .public)")
+        }
+        let monitor = SpaceMonitor(service: service, displays: { [weak self] in
+            self?.displays?.table ?? DisplayTable(screens: [])
+        })
+        monitor.logCurrentSpaces()
+        spaces = monitor
+    }
+
     private func permissionChanged(_ granted: Bool) {
         menuBar?.update(Self.menuState(permissionGranted: granted))
     }
@@ -68,6 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for display in displays?.table.displays ?? [] {
             lines.append("  \(display.name) [\(display.id)] frame \(display.frame) usable \(display.usableArea)\(display.isPrimary ? " primary" : "")")
         }
+        let service = SkyLightSpaceService.shared
+        lines.append("Space functions: " + ["MainConnectionID", "CopyManagedDisplaySpaces", "CopySpacesForWindows", "AXUIElementGetWindow"]
+            .map { "\($0)=\(service.resolvedFunctions[$0] ?? "missing")" }.joined(separator: ", "))
+        lines += spaces?.describe() ?? []
         return lines.joined(separator: "\n")
     }
 }

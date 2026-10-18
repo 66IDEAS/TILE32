@@ -26,6 +26,7 @@ let package = Package(
         .executableTarget(name: "FakeWindows"),
         .testTarget(name: "TileCoreTests", dependencies: ["TileCore"]),
         .testTarget(name: "TileGeometryTests", dependencies: ["TileGeometry"]),
+        .testTarget(name: "TileSpacesTests", dependencies: ["TileSpaces"]),
         .testTarget(name: "TileEngineTests", dependencies: ["TileEngine"]),
     ]
 )
