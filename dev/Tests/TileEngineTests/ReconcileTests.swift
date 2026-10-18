@@ -350,4 +350,34 @@ struct ReconcileTests {
         #expect(!world.window(3)!.minimised)
         #expect(Set(ids(await engine.trees[key2])) == [1, 2, 3])
     }
+
+    @Test func sixteenDesktopsNeverWriteToAHiddenOne() async {
+        let world = World()
+        // Three windows on each of 16 desktops (Spaces 100 to 115).
+        for desktop in 0..<16 {
+            for index in 0..<3 {
+                world.add(UInt64(1000 + desktop * 10 + index), x: CGFloat(100 + index * 1500), space: SpaceID(UInt64(100 + desktop)))
+            }
+        }
+        let engine = LayoutEngine(writer: world)
+        func space(_ desktop: Int) -> SpaceInfo { SpaceInfo(id: SpaceID(UInt64(100 + desktop)), uuid: "D\(desktop)", type: 0, desktopNumber: desktop + 1) }
+        // Visit every desktop once: each gets its own layout.
+        for desktop in 0..<16 { _ = await engine.reconcile(world.observe(space: space(desktop))) }
+        #expect(await engine.trees.count == 16)
+        // Switch around many times: nothing changes, so nothing is written (US-12.2, US-12.3).
+        let before = world.writes
+        for round in 0..<5 {
+            for desktop in stride(from: 15, through: 0, by: -1) where (desktop + round) % 2 == 0 {
+                let summary = await engine.reconcile(world.observe(space: space(desktop)))
+                #expect(summary.written == 0)
+            }
+        }
+        #expect(world.writes == before)
+        // A window closed on desktop 7 changes only desktop 7's layout when it is shown.
+        world.remove(1070)
+        let summary = await engine.reconcile(world.observe(space: space(7)))
+        #expect(summary.departed == 1)
+        #expect(ids(await engine.trees[LayoutKey(space: SpaceID(107), display: dell)]) == [1071, 1072])
+        #expect(ids(await engine.trees[LayoutKey(space: SpaceID(108), display: dell)]) == [1080, 1081, 1082])
+    }
 }

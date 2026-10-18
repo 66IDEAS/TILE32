@@ -301,11 +301,12 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Result:** live check on 2026-10-18 with FakeWindows and limit 3: a 4th window took the least recently used tile, a restored window swapped in, a closed window's tile was refilled. Waiting for the M1 acceptance with real apps.
 - **Errors found:** right after a swap, a reading during the minimise and restore animations saw the returning window as still minimised and swapped once more (flapping). Fixed: after a run that minimised, restored or took in a window, the next reading waits 800 ms. Re-run: exactly one cycle per step. Resolved 2026-10-18.
 
-### [ ] T-1.12 Engine test coverage for M1
+### [x] T-1.12 Engine test coverage for M1
 - **Do:** Complete `TileEngineTests` with fakes for AX, geometry and Spaces for every M1 behaviour listed in TA-24 level 2.
 - **Traces:** TA-24
 - **Done when:** `swift test` passes and covers each M1 story with at least one test.
 - **Depends on:** T-1.1 to T-1.11, T-1.14
+- **Result:** 19 reconcile tests with a simulated world cover every M1 story of the engine: new and closed windows, minimise and restore, hidden apps, apps that did not answer, Space switching with 16 desktops and no write to a hidden desktop, moves between desktops, full screen, display disconnect, put-back once, windows that cannot shrink, the window limit (swap, refill, limit changes), Tile now. Coordinator behaviour (coalescing, mouse button, echo suppression, settle time) is checked live with FakeWindows. 162 tests in total. Done 2026-10-18.
 
 ### [ ] T-1.13 [owner] M1 acceptance
 - **Do:** Go through the M1 checklist on both displays, with several Spaces.
