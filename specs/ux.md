@@ -2,7 +2,7 @@
 
 Status: draft for review
 Date: 2026-10-11, revised 2026-10-18
-Inputs: `specs/specifications.md` (US-1..US-27), `specs/architecture.md` (TA-15 overlay, TA-17 menu-bar layer), prototype `/Users/alexanderilg/dev/vibe/tiling-window-demo/index.html` (look of the drop preview)
+Inputs: `specs/specifications.md` (US-1..US-30), `specs/architecture.md` (TA-15 overlay, TA-17 menu-bar layer, TA-25 resizing), prototype `prototype/index.html` (look of the drop preview)
 
 TILE32 is a small utility with almost no interface. There is no main window and no Dock icon. The whole UI is: the menu-bar icon, its menu, the drop-zone overlay shown while dragging, one first-run explanation, and the look of the tiled windows. Each entry below has a number (UX-n), a title, a description, and a "Serves" line with the user stories (US) it supports.
 

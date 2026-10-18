@@ -33,7 +33,7 @@ The name comes from the 32:9 aspect ratio of the user's ultrawide display (5120x
 
 ## 4. Layout rules (apply to all stories)
 
-These rules define how a layout behaves. They match the interactive reference prototype (`/Users/alexanderilg/dev/vibe/tiling-window-demo/index.html`, mode 2, drag-to-split).
+These rules define how a layout behaves. They match the interactive reference prototype (`prototype/index.html`, mode 2, drag-to-split).
 
 - **L1. Shape.** A layout is a set of nested splits. Each tile holds exactly one window. Every split divides its space among its parts by proportions that add up to 100 percent. Proportions belong to the tiles, not to the windows: when two windows swap places, each takes the other's size.
 - **L2. Default layout.** When a layout has several windows and no arrangement yet, they are placed side by side as equal columns.

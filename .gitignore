@@ -2,3 +2,4 @@ tmp/
 dev/build/
 dev/.build/
 .DS_Store
+dev/.swiftpm/

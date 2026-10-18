@@ -2,8 +2,8 @@
 
 Status: draft for review
 Date: 2026-10-11, revised 2026-10-18
-Inputs: `specs/specifications.md` (US-1..US-27, layout rules L1-L7, N-1..N-10, C-1..C-9), `specs/constitution.md`
-Reference prototype for the layout logic: `/Users/alexanderilg/dev/vibe/tiling-window-demo/index.html` (functions `norm`, `without`, `repl`, `swapIds`, `layoutTree`, `zoneOf`, `applyDrop`)
+Inputs: `specs/specifications.md` (US-1..US-30, layout rules L1-L8, N-1..N-12, C-1..C-10), `specs/constitution.md`
+Reference prototype for the layout logic: `prototype/index.html` (functions `norm`, `without`, `repl`, `swapIds`, `layoutTree`, `zoneOf`, `applyDrop`)
 
 Each entry has a number (TA-n), a title, a description, and a "Serves" line that lists the user stories (US), layout rules (L), non-functional requirements (N) and constraints (C) it supports. Section 9 maps every user story back to the entries.
 
@@ -60,7 +60,7 @@ Dependency rule: `TileCore` imports only Foundation and CoreGraphics value types
 
 ### TA-2 Packaging and module structure
 
-**Description:** The code lives in one Swift package, `TileKit`, with library targets `TileCore`, `TileGeometry`, `TileSpaces`, `TileAX`, `TileEngine`, `TileInput` and `TileUI`, plus test targets for `TileCore` and `TileEngine`. The app itself is a thin executable target `TILE32` that wires the modules together and is assembled into a `.app` bundle by a build script (see TA-22). A second executable target `FakeWindows` is a small SwiftUI app used only for testing (see TA-24). Keeping the package SwiftPM-only avoids a hand-edited Xcode project file; Xcode can still open `Package.swift` for debugging.
+**Description:** The code lives in one Swift package, `TileKit`, with library targets `TileCore`, `TileLog`, `TileGeometry`, `TileSpaces`, `TileAX`, `TileEngine`, `TileInput` and `TileUI`, plus test targets for `TileCore`, `TileGeometry` and `TileEngine`. `TileLog` holds the loggers of TA-23, so that `TileCore` never imports `os`. The app itself is a thin executable target `TILE32` that wires the modules together and is assembled into a `.app` bundle by a build script (see TA-22). A second executable target `FakeWindows` is a small SwiftUI app used only for testing (see TA-24). Keeping the package SwiftPM-only avoids a hand-edited Xcode project file; Xcode can still open `Package.swift` for debugging.
 
 **Serves:** N-3, N-5 (via testability), all stories (structure)
 
@@ -112,7 +112,8 @@ The engine keeps `[LayoutKey: LayoutTree]`. Only the trees whose Space is curren
 | `splitting(target:, with:, zone:)` | Removes the dragged leaf (`removing`), then replaces the target leaf with a split of two children at 0.5 each, in the target's position and with the target's weight (horizontal for left/right, vertical for top/bottom; dragged window first for left/top, last for right/bottom), then normalises | `applyDrop` + `repl` | L6, US-15 |
 | `flat(_ ids: [WindowID])` | Builds a horizontal split of equal columns from an ordered list | initial state | L2, US-4 |
 | `resizing(window:, edge:, to:, in rect:)` | Finds the nearest ancestor split in the edge's direction in which the window's branch has a neighbour on that side, and moves the boundary between the two to the given screen coordinate: only those two weights change. Clamps to the minimum of rule L8 (10 percent of the split, at least 200 points). Returns the tree unchanged for an outer edge, which has no neighbour | new | L8, US-28 |
-| `snapped(boundary:)` | Moves a boundary to the nearest of 1/4, 1/3, 1/2, 2/3, 3/4 of its split when within 0.01, measured on the cumulative position of the boundary | new | L8, US-28.5 |
+| `snap: true` on `resizing`, with `snappedRatio(_:)` | Moves the boundary to the nearest of 1/4, 1/3, 1/2, 2/3, 3/4 of its split when within 0.01, measured on the cumulative position of the boundary. Used on release, not while dragging | new | L8, US-28.5 |
+| `dropping(_:on:zone:)` | Dispatches a drop: `swapping` for the centre zone, `splitting` for an edge zone | `applyDrop` | L6 |
 | `equalized()` | Sets every weight in every split to `1 / n` without changing the structure | new | US-28.9 |
 
 Edge cases that must be covered by tests: dragging the only window, dropping a window on itself (no-op), a target that is not in the tree (no-op), a tree that shrinks to one leaf, weights that drift through many operations (they must always sum to 1 within 1e-9), resizing at the minimum, resizing an outer edge, and dropping onto a window of a different display or Space (handled by the engine as remove from tree A plus insert into tree B, see TA-14).
@@ -317,14 +318,15 @@ Across a restart (US-26 only), a window is described by bundle identifier, windo
 | Task | Command |
 |---|---|
 | Unit tests for the core and the engine | `swift test` |
-| Build the app bundle | `./build-app.sh` (runs `swift build -c release`, creates `build/TILE32.app` with `Info.plist` including `LSUIElement`, then signs it) |
+| Build the app bundle | `./build-app.sh` (debug configuration, so the debug menu and title logging are available; creates `build/TILE32.app` with `Info.plist` including `LSUIElement`, then signs it with the Apple Development certificate) |
 | Build the test app | `./build-app.sh FakeWindows` |
+| Release build | `./build-app.sh TILE32 release` (release configuration, Developer ID, notarization; task T-3.8) |
 
 **Identifiers:** the app is `com.66ideas.tile32`, the test app `com.66ideas.tile32.FakeWindows`. They never change (N-12).
 
 **Signing:** macOS ties the Accessibility permission to the app's identifier and code signature. An ad-hoc signature changes with every build, which would reset the permission every time. Development builds are therefore signed with the owner's "Apple Development: Alexander Ilg" certificate, always with the hardened runtime, at the fixed output path `dev/build/TILE32.app`.
 
-**Notarization (N-11):** release builds are signed with the owner's "Developer ID Application: Alexander Ilg (AHBM4Y6VPX)" certificate with a secure timestamp and the hardened runtime, then submitted with `xcrun notarytool submit --wait` and stapled with `xcrun stapler staple`. Notarization checks the signature, the hardened runtime and malware, not which functions an app calls, so the undocumented functions of TA-26 do not block it. A release build has a different signature than a development build, so macOS asks for the Accessibility permission once more for each of them. The script target is `./build-app.sh release`, and the notarization credentials are stored in the keychain with `notarytool store-credentials`, never in the repository. Notarization is set up in M3, but the hardened runtime and clean entitlements are used from the first build so nothing has to change later.
+**Notarization (N-11):** release builds are signed with the owner's "Developer ID Application: Alexander Ilg (AHBM4Y6VPX)" certificate with a secure timestamp and the hardened runtime, then submitted with `xcrun notarytool submit --wait` and stapled with `xcrun stapler staple`. Notarization checks the signature, the hardened runtime and malware, not which functions an app calls, so the undocumented functions of TA-26 do not block it. A release build has a different signature than a development build, so macOS asks for the Accessibility permission once more for each of them. The script target is `./build-app.sh TILE32 release`, and the notarization credentials are stored in the keychain with `notarytool store-credentials`, never in the repository. Notarization is set up in M3, but the hardened runtime and clean entitlements are used from the first build so nothing has to change later.
 
 **Serves:** N-8, N-11, N-12, US-2
 
@@ -362,7 +364,7 @@ The `FakeWindows` app is a small SwiftUI app that opens windows on command with 
 1. **Which edges:** on the first resize notification, the AX layer reads W's frame on W's app queue, and the engine compares it with W's tile. Each edge that moved by more than 2 points is an active edge; a corner drag gives two. An active edge on the display border has no neighbour and is ignored; W is put back into its tile on release (US-19.2).
 2. **Live update (US-28.4):** on each `leftMouseDragged`, throttled to 30 updates per second, the AX layer reads W's current frame, and the engine computes `resizing(window: W, edge:, to: edge coordinate + gap / 2, in: layout rect)` on a working copy of the tree. It writes the new frames of all other affected windows, never of W itself, because the user is holding W. The writes go through the expected-frame suppression of TA-12.
 3. **Slow apps (Q-13):** the AX layer measures how long each app takes to accept a frame. If an app needs more than 50 ms on average over the last five writes, live updates for that app's windows pause until release, and the log notes it.
-4. **Release:** on `leftMouseUp`, the engine reads W's final frame, applies `resizing` and then `snapped`, commits the tree, and writes all affected frames including W, so W lines up with the gap and the snapped boundary.
+4. **Release:** on `leftMouseUp`, the engine reads W's final frame, applies `resizing` with `snap: true`, commits the tree, and writes all affected frames including W, so W lines up with the gap and the snapped boundary.
 5. **Percentage label:** during the resize, the overlay (TA-15) shows W's share of its split, rounded to whole percent, in the centre of W's tile. When the boundary would snap on release, the label shows the snapped value.
 6. **Clamping:** if the user drags past the minimum of rule L8, the tree stops at the minimum. W itself may briefly overlap its neighbour while the button is held, and is set back to its tile on release.
 
@@ -473,7 +475,7 @@ Other known risks: apps that fight window placement (some games, some Electron a
 
 ---
 
-## 5. Repository layout (under `/Users/alexanderilg/dev/git/TILE32/dev`)
+## 5. Repository layout (under `/Volumes/sdcard/git/TILE32/dev`)
 
 ```
 dev/
@@ -484,6 +486,7 @@ dev/
     TILE32.entitlements         hardened runtime, no extra entitlements
   Sources/
     TileCore/                   LayoutNode, LayoutTree, operations, frames, drop zones (pure)
+    TileLog/                    os.Logger per category (TA-23)
     TileGeometry/               display table, coordinate conversion, DisplayID
     TileSpaces/                 SpaceService protocol, SkyLight implementation (runtime-resolved), fallback
     TileAX/                     AXWorker, observers, attribute reads, frame writes, classification inputs
@@ -494,6 +497,7 @@ dev/
     FakeWindows/                SwiftUI test app
   Tests/
     TileCoreTests/
+    TileGeometryTests/
     TileEngineTests/
   THIRD_PARTY_NOTICES.md        licences and attribution for any code taken from other open-source projects
 ```

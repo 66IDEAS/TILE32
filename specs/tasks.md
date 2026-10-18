@@ -26,59 +26,62 @@ Sources: `specs/specifications.md` (US-1..US-30, L1-L8, N-1..N-12, C-1..C-10), `
 
 Goal: prove that TILE32 can see and arrange windows, answer the two highest risks (S1, S6), and build the pure layout core with its tests.
 
-### [ ] T-0.1 Scaffold the repository
+### [x] T-0.1 Scaffold the repository
 - **Do:** Create `dev/Package.swift` (package `TileKit`) with library targets `TileCore`, `TileGeometry`, `TileSpaces`, `TileAX`, `TileEngine`, `TileInput`, `TileUI`, executable targets `TILE32` and `FakeWindows`, and test targets `TileCoreTests`, `TileEngineTests`. Swift 6 language mode, strict concurrency, macOS 27 deployment target. Add `dev/Resources/Info.plist` (`CFBundleIdentifier` `com.66ideas.tile32`, `LSUIElement` YES, version 0.1.0), `dev/Resources/TILE32.entitlements` (hardened runtime, no exceptions), `dev/THIRD_PARTY_NOTICES.md` (empty template), and extend the root `.gitignore` with `dev/.build/` and `dev/build/`.
 - **Traces:** TA-1, TA-2, TA-21, TA-22, N-8, N-12, constitution technical rules 4, 10, 11
 - **Done when:** `swift build` in `dev/` succeeds with empty targets, and the folder layout matches architecture section 5.
 - **Depends on:** -
 
-### [ ] T-0.2 Build and signing script
+### [x] T-0.2 Build and signing script
 - **Do:** Write `dev/build-app.sh`. It builds in release mode, assembles `dev/build/TILE32.app` (or `FakeWindows.app` with bundle id `com.66ideas.tile32.FakeWindows`), copies `Info.plist`, and signs with "Apple Development: Alexander Ilg" plus the hardened runtime. Keep a `release` mode stub for T-3.8.
 - **Traces:** TA-22, S5, N-11, N-12
 - **Done when:** `codesign --verify --strict` passes, and `codesign -dv` shows identifier `com.66ideas.tile32`, the Apple Development authority and the runtime flag.
 - **Depends on:** T-0.1
+- **Errors found:** a comment inside `TILE32.entitlements` made `codesign` reject the file ("AMFIUnserializeXML: syntax error"), and the script did not stop because the call was piped. Fixed: the entitlements file contains no comments. Resolved 2026-10-18.
 
-### [ ] T-0.3 TileCore: data model and normalisation
+### [x] T-0.3 TileCore: data model and normalisation
 - **Do:** Implement `WindowID`, `SplitDirection`, `SplitChild` (with weight), `LayoutNode`, `LayoutTree`, `DropZone`, and `normalized()` with weight multiplication when flattening and rescaling to a sum of 1. Port from the prototype's `norm`.
 - **Traces:** TA-3, TA-4, L1, L5
 - **Done when:** unit tests pass for empty split, single-child split, nested same-direction splits, deep nesting, and weights summing to 1 within 1e-9.
 - **Depends on:** T-0.1
 
-### [ ] T-0.4 TileCore: tree operations
+### [x] T-0.4 TileCore: tree operations
 - **Do:** Implement `removing`, `appending`, `swapping`, `splitting(target:with:zone:)` and `flat`, all with weights as described in TA-4. Port from `without`, `addWin`, `swapIds`, `applyDrop` and `repl`.
 - **Traces:** TA-4, TA-24, L2-L6, US-6, US-7, US-14, US-15
 - **Done when:** tests pass for the prototype scenarios (D on the bottom of A gives `[vertical[A, D], B, C]`; D right of B gives 1/3, 1/6, 1/6, 1/3), the weight examples of L3 and L4, swaps across branches, dropping on itself, unknown targets, and one-window trees.
 - **Depends on:** T-0.3
 
-### [ ] T-0.5 TileCore: frame computation
+### [x] T-0.5 TileCore: frame computation
 - **Do:** Implement `frames(in:gap:)` with weighted boundaries, the gap rule (inset by gap/2 twice) and edge-based rounding, plus `rawShares(in:)`.
 - **Traces:** TA-5, L7, N-10
 - **Done when:** tests show no overlap, an even gap, no one-point seams on odd sizes, and correct results on 5120x1440 and on a tall 1440x5120 rectangle.
 - **Depends on:** T-0.4
 
-### [ ] T-0.6 TileCore: drop zones and drop targets
+### [x] T-0.6 TileCore: drop zones and drop targets
 - **Do:** Implement `zone(at:in:)` (0.28 / 0.72 constants in one place, tie order left, right, top, bottom), `dropTarget(...)` returning `.window(id, zone, rect)` or `.emptyDisplay(rect)`, and `previewRect(target)`.
 - **Traces:** TA-6, L6, US-14, US-15, US-16, US-18
 - **Done when:** boundary tests at 0.279, 0.28, 0.72, 0.721 pass, corner ties resolve as specified, and the empty-display case is covered.
 - **Depends on:** T-0.5
+- **Errors found:** a corner tie at (0.1, 0.9) resolved to "bottom" instead of "left", because 1 - 0.9 is 0.09999999999999998 in floating point (the prototype has the same flaw). Fixed: distances within 1e-9 count as a tie. Resolved 2026-10-18.
 
-### [ ] T-0.7 TileCore: resizing, snapping and equalizing
+### [x] T-0.7 TileCore: resizing, snapping and equalizing
 - **Do:** Implement `resizing(window:edge:to:in:)` (nearest ancestor split with a neighbour, only two weights change, minimum of 10 percent or 200 points), `snapped(boundary:)` (1/4, 1/3, 1/2, 2/3, 3/4 within 0.01 of the cumulative position) and `equalized()`.
 - **Traces:** TA-4, TA-25, L8, US-28
 - **Done when:** tests pass for the US-28.6 scenario (thirds to 0.5, 0.25, 0.25), a resize inside a nested column, an outer edge (no change), the minimum clamp, and snapping at 0.49 and 0.51.
 - **Depends on:** T-0.5
 
-### [ ] T-0.8 TileGeometry
+### [x] T-0.8 TileGeometry
 - **Do:** Build the display table from `NSScreen` with `DisplayID` (display UUID), usable area in AX coordinates, `display(containing:)`, and the only coordinate conversion functions `axRect(fromAppKit:)` and `appKitRect(fromAX:)`. Rebuild on `didChangeScreenParameters`.
 - **Traces:** TA-7, US-5, US-9, N-10, constitution technical rule 9
 - **Done when:** conversion tests pass for the owner's arrangement (ultrawide and laptop side by side, with different heights), and a debug log lists both displays with correct usable areas.
 - **Depends on:** T-0.1
 
-### [ ] T-0.9 Logging and debug menu
+### [~] T-0.9 Logging and debug menu
 - **Do:** Add `os.Logger` with subsystem `com.66ideas.tile32` and categories `engine`, `ax`, `drag`, `resize`, `spaces`, `layout`, `ui`. Titles are logged only in debug builds. Add the debug-only "Debug" submenu with "Dump layout trees" and "Copy diagnostics" placeholders.
 - **Traces:** TA-23
 - **Done when:** `log stream --predicate 'subsystem == "com.66ideas.tile32"'` shows messages from a debug build, and none of them contain window titles in a release build.
 - **Depends on:** T-0.1
+- **Progress:** the loggers live in a small extra module `TileLog`, because `TileCore` must not import `os`. Messages from the signed debug build appear in `/usr/bin/log` (in zsh, plain `log` is a shell built-in, so use the full path). Open: the "Debug" submenu, which needs the menu of T-0.10, and the release-build check for titles, which needs the release mode of T-0.2.
 
 ### [ ] T-0.10 Menu-bar shell
 - **Do:** Create the status item with the three icon states (`rectangle.split.2x2`, `rectangle.dashed`, `exclamationmark.triangle`, template images), and a menu rebuilt in `menuNeedsUpdate` with the status line, "Tile now", "Windows" (empty for now) and "Quit TILE32". No Dock icon. VoiceOver label "TILE32" with the state as its value.

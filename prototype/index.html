@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiling demo</title>
+<style>
+:root{
+  --bg:#f5f5f3; --card:#ffffff; --text:#1c1c1a; --muted:#6b6b66; --line:#d6d6d0;
+  --accent:#2563eb; --accent-bg:rgba(37,99,235,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#1b1b1a; --card:#262625; --text:#ececea; --muted:#a3a39d; --line:#3d3d3a;
+    --accent:#6ea0ff; --accent-bg:rgba(110,160,255,.20); }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+h1{font-size:18px;font-weight:600;margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-size:14px;padding:7px 14px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+#hint{color:var(--muted);font-size:14px;min-height:22px}
+#stage{position:relative;flex:1;min-height:420px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.slot{position:absolute;padding:4px;transition:left .25s ease,top .25s ease,width .25s ease,height .25s ease}
+.slot.dragging{transition:none;z-index:10}
+.win{height:100%;border-radius:10px;border:1px solid rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;
+  background:hsl(var(--h) 70% 88%);color:hsl(var(--h) 60% 22%)}
+@media (prefers-color-scheme: dark){ .win{border-color:rgba(255,255,255,.2);background:hsl(var(--h) 35% 24%);color:hsl(var(--h) 70% 86%)} }
+.slot.dragging .win{cursor:grabbing;opacity:.92;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:6px 6px 6px 12px;font-weight:600}
+.x{border:none;background:transparent;color:inherit;padding:0 8px;font-size:20px;line-height:1;cursor:pointer}
+.x:hover{background:rgba(0,0,0,.12);border-radius:6px}
+.lines{padding:4px 12px;display:flex;flex-direction:column;gap:8px}
+.lines i{display:block;height:7px;border-radius:4px;background:currentColor;opacity:.2}
+#ov{position:absolute;display:none;pointer-events:none;z-index:20;border:3px solid var(--accent);background:var(--accent-bg);border-radius:10px;align-items:center;justify-content:center;font-weight:600;color:var(--accent)}
+#count{margin-left:auto;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<h1>Tiling demo: three ways to arrange windows</h1>
+<div class="row" id="modes">
+  <button data-mode="auto">1. Automatic</button>
+  <button data-mode="tree">2. Drag-to-split</button>
+  <button data-mode="menu">3. Pick a layout</button>
+</div>
+<div id="hint"></div>
+<div class="row" id="layouts" hidden>
+  <button data-layout="columns">Columns</button>
+  <button data-layout="rows">Rows</button>
+  <button data-layout="main">Main + stack</button>
+  <button data-layout="grid">Grid</button>
+</div>
+<div id="stage"><div id="ov"></div></div>
+<div class="row">
+  <button id="add">+ Open new app</button>
+  <button id="reset">Reset</button>
+  <span id="count"></span>
+</div>
+
+<script>
+const NAMES=['Mail','Browser','Notes','Code','Terminal','Calendar','Chat','Files'];
+const HUES=[210,140,270,28,175,320,50,0];
+const HINTS={
+  auto:'Windows always share the screen evenly. Open a new app, close one with x, or drag a window onto another to swap them.',
+  tree:'Click "Open new app", then drag the new window onto the TOP or BOTTOM edge of the left window. The blue highlight shows where it will land.',
+  menu:'Switch layouts with the buttons. Drag a window onto another to swap. In "Main + stack" the first window is the big one.'
+};
+const stage=document.getElementById('stage');
+const ov=document.getElementById('ov');
+const META={};
+const S={};
+let mode='auto';
+let els=new Map();
+let drag=null;
+
+function mk(m){
+  const i=S[m].cnt++;
+  const id=m+i;
+  META[id]={name:NAMES[i%8],hue:HUES[i%8]};
+  return id;
+}
+function init(m){
+  S[m]={cnt:0,list:[],root:null,layout:'columns'};
+  const ids=[mk(m),mk(m),mk(m)];
+  if(m==='tree') S[m].root={t:'s',d:'h',c:ids.map(id=>({t:'l',id}))};
+  else S[m].list=ids;
+}
+['auto','tree','menu'].forEach(init);
+
+function layoutList(ids,kind){
+  const n=ids.length,out=[];
+  if(!n) return out;
+  if(kind==='columns') ids.forEach((id,i)=>out.push({id,x:i/n,y:0,w:1/n,h:1}));
+  else if(kind==='rows') ids.forEach((id,i)=>out.push({id,x:0,y:i/n,w:1,h:1/n}));
+  else if(kind==='main'){
+    if(n===1) out.push({id:ids[0],x:0,y:0,w:1,h:1});
+    else{
+      out.push({id:ids[0],x:0,y:0,w:0.6,h:1});
+      for(let i=1;i<n;i++) out.push({id:ids[i],x:0.6,y:(i-1)/(n-1),w:0.4,h:1/(n-1)});
+    }
+  }else{
+    const cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);
+    let k=0;
+    for(let r=0;r<rows;r++){
+      const m=r<rows-1?cols:n-cols*(rows-1);
+      for(let c=0;c<m;c++) out.push({id:ids[k++],x:c/m,y:r/rows,w:1/m,h:1/rows});
+    }
+  }
+  return out;
+}
+function layoutTree(node,x,y,w,h,out){
+  if(!node) return;
+  if(node.t==='l'){out.push({id:node.id,x,y,w,h});return;}
+  const n=node.c.length;
+  node.c.forEach((ch,i)=>{
+    if(node.d==='h') layoutTree(ch,x+w*i/n,y,w/n,h,out);
+    else layoutTree(ch,x,y+h*i/n,w,h/n,out);
+  });
+}
+function norm(node){
+  if(!node) return null;
+  if(node.t==='l') return node;
+  const kids=[];
+  for(const ch of node.c){
+    const m=norm(ch);
+    if(!m) continue;
+    if(m.t==='s'&&m.d===node.d) kids.push(...m.c); else kids.push(m);
+  }
+  if(!kids.length) return null;
+  if(kids.length===1) return kids[0];
+  return {t:'s',d:node.d,c:kids};
+}
+function without(node,id){
+  if(!node) return null;
+  if(node.t==='l') return node.id===id?null:node;
+  return {t:'s',d:node.d,c:node.c.map(c=>without(c,id)).filter(Boolean)};
+}
+function repl(node,id,fn){
+  if(node.t==='l') return node.id===id?fn(node):node;
+  return {t:'s',d:node.d,c:node.c.map(c=>repl(c,id,fn))};
+}
+function swapIds(node,a,b){
+  if(node.t==='l') return {t:'l',id:node.id===a?b:node.id===b?a:node.id};
+  return {t:'s',d:node.d,c:node.c.map(c=>swapIds(c,a,b))};
+}
+function rects(){
+  const st=S[mode];
+  if(mode==='tree'){const out=[];layoutTree(st.root,0,0,1,1,out);return out;}
+  if(mode==='auto') return layoutList(st.list,st.list.length<=3?'columns':'grid');
+  return layoutList(st.list,st.layout);
+}
+
+function mkEl(id){
+  const m=META[id];
+  const slot=document.createElement('div');
+  slot.className='slot';
+  slot.innerHTML='<div class="win" style="--h:'+m.hue+'"><div class="bar"><span>'+m.name+'</span><button class="x" title="Close">&times;</button></div><div class="lines"><i style="width:80%"></i><i style="width:55%"></i><i style="width:70%"></i></div></div>';
+  const win=slot.firstChild;
+  const x=slot.querySelector('.x');
+  x.addEventListener('pointerdown',e=>e.stopPropagation());
+  x.addEventListener('click',e=>{e.stopPropagation();closeWin(id);});
+  win.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    e.preventDefault();
+    drag={id,slot,win,sx:e.clientX,sy:e.clientY,target:null,zone:null};
+    slot.classList.add('dragging');
+  });
+  return slot;
+}
+
+function render(){
+  const rs=rects();
+  const keep=new Set(rs.map(r=>r.id));
+  for(const [id,el] of els){ if(!keep.has(id)){el.remove();els.delete(id);} }
+  rs.forEach(r=>{
+    let el=els.get(r.id);
+    if(!el){el=mkEl(r.id);stage.appendChild(el);els.set(r.id,el);}
+    el.style.left=(r.x*100)+'%';
+    el.style.top=(r.y*100)+'%';
+    el.style.width=(r.w*100)+'%';
+    el.style.height=(r.h*100)+'%';
+  });
+  document.getElementById('count').textContent=rs.length+(rs.length===1?' window':' windows');
+}
+
+function addWin(){
+  const st=S[mode];
+  if(rects().length>=8) return;
+  const id=mk(mode);
+  if(mode==='tree'){
+    const leaf={t:'l',id},r=st.root;
+    if(!r) st.root=leaf;
+    else if(r.t==='s'&&r.d==='h') st.root=norm({t:'s',d:'h',c:[...r.c,leaf]});
+    else st.root=norm({t:'s',d:'h',c:[r,leaf]});
+  }else st.list.push(id);
+  render();
+}
+function closeWin(id){
+  const st=S[mode];
+  if(mode==='tree') st.root=norm(without(st.root,id));
+  else st.list=st.list.filter(x=>x!==id);
+  render();
+}
+function applyDrop(dragId,target,zone){
+  const st=S[mode];
+  if(mode!=='tree'){
+    const a=st.list.indexOf(dragId),b=st.list.indexOf(target);
+    if(a>-1&&b>-1){const t=st.list[a];st.list[a]=st.list[b];st.list[b]=t;}
+    return;
+  }
+  if(zone==='center'){st.root=swapIds(st.root,dragId,target);return;}
+  let r=norm(without(st.root,dragId));
+  const dir=(zone==='left'||zone==='right')?'h':'v';
+  const first=(zone==='left'||zone==='top');
+  r=repl(r,target,leaf=>({t:'s',d:dir,c:first?[{t:'l',id:dragId},leaf]:[leaf,{t:'l',id:dragId}]}));
+  st.root=norm(r);
+}
+function zoneOf(r,px,py){
+  if(mode!=='tree') return 'center';
+  const rx=(px-r.x)/r.w,ry=(py-r.y)/r.h;
+  if(rx>0.28&&rx<0.72&&ry>0.28&&ry<0.72) return 'center';
+  const d={left:rx,right:1-rx,top:ry,bottom:1-ry};
+  return Object.keys(d).reduce((a,b)=>d[a]<=d[b]?a:b);
+}
+const LABEL={center:'Swap places',left:'Place on the left',right:'Place on the right',top:'Place above',bottom:'Place below'};
+function showOv(r,zone){
+  let x=r.x,y=r.y,w=r.w,h=r.h;
+  if(zone==='left') w=r.w/2;
+  if(zone==='right'){x=r.x+r.w/2;w=r.w/2;}
+  if(zone==='top') h=r.h/2;
+  if(zone==='bottom'){y=r.y+r.h/2;h=r.h/2;}
+  ov.style.display='flex';
+  ov.style.left='calc('+(x*100)+'% + 4px)';
+  ov.style.top='calc('+(y*100)+'% + 4px)';
+  ov.style.width='calc('+(w*100)+'% - 8px)';
+  ov.style.height='calc('+(h*100)+'% - 8px)';
+  ov.textContent=LABEL[zone];
+}
+
+document.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  drag.win.style.transform='translate('+(e.clientX-drag.sx)+'px,'+(e.clientY-drag.sy)+'px)';
+  const b=stage.getBoundingClientRect();
+  const px=(e.clientX-b.left)/b.width,py=(e.clientY-b.top)/b.height;
+  const hit=rects().find(r=>r.id!==drag.id&&px>=r.x&&px<r.x+r.w&&py>=r.y&&py<r.y+r.h);
+  if(hit){drag.target=hit.id;drag.zone=zoneOf(hit,px,py);showOv(hit,drag.zone);}
+  else{drag.target=null;drag.zone=null;ov.style.display='none';}
+});
+function endDrag(){
+  if(!drag) return;
+  const d=drag;
+  drag=null;
+  ov.style.display='none';
+  d.win.style.transform='';
+  d.slot.classList.remove('dragging');
+  if(d.target) applyDrop(d.id,d.target,d.zone);
+  render();
+}
+document.addEventListener('pointerup',endDrag);
+document.addEventListener('pointercancel',endDrag);
+
+function syncLayoutBtns(){
+  document.querySelectorAll('#layouts button').forEach(b=>b.classList.toggle('on',b.dataset.layout===S.menu.layout));
+}
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  document.getElementById('layouts').hidden=(m!=='menu');
+  document.getElementById('hint').textContent=HINTS[m];
+  for(const [,el] of els) el.remove();
+  els=new Map();
+  ov.style.display='none';
+  syncLayoutBtns();
+  render();
+}
+document.querySelectorAll('#modes button').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+document.querySelectorAll('#layouts button').forEach(b=>b.addEventListener('click',()=>{S.menu.layout=b.dataset.layout;syncLayoutBtns();render();}));
+document.getElementById('add').addEventListener('click',addWin);
+document.getElementById('reset').addEventListener('click',()=>{init(mode);setMode(mode);});
+setMode('auto');
+</script>
+</body>
+</html>
