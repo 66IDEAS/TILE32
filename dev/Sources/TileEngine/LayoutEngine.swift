@@ -111,6 +111,17 @@ public actor LayoutEngine {
     var minimisedSnapshots: [WindowID: WindowSnapshot] = [:]
     /// The app of every window seen, to keep windows of apps that did not answer.
     var windowPIDs: [WindowID: pid_t] = [:]
+    /// The last write durations per app, for the slow-app rule of live resizing (TA-25).
+    var writeDurations: [pid_t: [Duration]] = [:]
+    /// Apps slower than this on average over their last five writes do not follow a live
+    /// resize; their windows are written on release (TA-25, open question OQ-9).
+    public static let slowAppLimit: Duration = .milliseconds(50)
+
+    func isSlow(_ pid: pid_t) -> Bool {
+        guard let durations = writeDurations[pid], !durations.isEmpty else { return false }
+        let total = durations.reduce(Duration.zero, +)
+        return total / durations.count > Self.slowAppLimit
+    }
 
     public init(writer: FrameWriting = AXFrameWriter()) {
         self.writer = writer
@@ -159,6 +170,8 @@ public actor LayoutEngine {
         for item in batch {
             let id = item.id
             guard let result = results[id] else { failed += 1; continue }
+            writeDurations[item.window.app.pid, default: []].append(result.duration)
+            if writeDurations[item.window.app.pid]!.count > 5 { writeDurations[item.window.app.pid]!.removeFirst() }
             if result.doesNotFit {
                 notFitting += 1
                 doesNotFit.insert(id)

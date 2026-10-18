@@ -17,6 +17,7 @@ extension LayoutEngine {
                        currentSpaces: [DisplayID: SpaceInfo], snapshots: [WindowID: WindowSnapshot]) async -> Double? {
         guard let key = shownKey(of: id, displays: displays, currentSpaces: currentSpaces),
               let display = displays.display(id: key.display), var tree = trees[key] else { return nil }
+        var snappedPreview = tree
         // Tile boundaries sit half a gap outside the window's edges (rule L7).
         let half = Self.gap / 2
         let inner = display.usableArea.insetBy(dx: half, dy: half)
@@ -28,16 +29,21 @@ extension LayoutEngine {
             case .bottom: frame.maxY + half
             }
             tree = tree.resizing(window: id, edge: edge, to: position, in: inner, snap: final)
+            snappedPreview = snappedPreview.resizing(window: id, edge: edge, to: position, in: inner, snap: true)
         }
         trees[key] = tree
 
         var batch = frameBatch(displays: displays, currentSpaces: currentSpaces, snapshots: snapshots,
                                force: final ? [id] : [])
-        if !final { batch.removeAll { $0.id == id } }
+        if !final {
+            // The held window is the user's; slow apps follow on release only (TA-25).
+            batch.removeAll { $0.id == id || isSlow($0.window.app.pid) }
+        }
         _ = await apply(batch)
         if final { Log.resize.info("Resize of \(id.description, privacy: .public) ended, \(batch.count) written") }
 
-        guard let tile = tree.rawShares(in: inner)[id] else { return nil }
+        // The label shows the value the boundary will snap to on release (UX-16).
+        guard let tile = snappedPreview.rawShares(in: inner)[id] else { return nil }
         let horizontal = edges.contains(.left) || edges.contains(.right)
         return Double(horizontal ? tile.width / inner.width : tile.height / inner.height)
     }

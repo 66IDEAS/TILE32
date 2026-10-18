@@ -574,3 +574,59 @@ struct ResizeTests {
         #expect(world.window(1)!.frame == tile)
     }
 }
+
+@Suite("Live resize details (TA-25, UX-16)")
+struct LiveResizeDetailTests {
+    @Test func labelShowsTheValueItWillSnapTo() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        var a = world.window(1)!.frame
+        a.size.width = 2560 - 3 - a.minX - 30     // 30 points short of the middle: within 1 percent
+        let share = await engine.resize(WindowID(1), to: a, edges: [.right], final: false, displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(abs((share ?? 0) - 0.5) < 0.0001)
+    }
+
+    @Test func slowAppsFollowOnReleaseOnly() async {
+        let world = World()
+        world.add(1, x: 100, pid: 100); world.add(2, x: 1500, pid: 200)
+        let engine = LayoutEngine(writer: SlowWriter(world: world, slowPID: 200))
+        _ = await engine.reconcile(world.observe())
+        _ = await engine.reconcile(world.observe(), rebuild: true)   // a few writes to measure app 200
+        let neighbour = world.window(2)!.frame
+        var a = world.window(1)!.frame
+        a.size.width += 400
+        world.update(1) { $0.frame = a }
+        _ = await engine.resize(WindowID(1), to: a, edges: [.right], final: false, displays: bothDisplays,
+                                currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(world.window(2)!.frame == neighbour)
+        _ = await engine.resize(WindowID(1), to: a, edges: [.right], final: true, displays: bothDisplays,
+                                currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(world.window(2)!.frame != neighbour)
+    }
+}
+
+/// Reports 80 ms per write for one app, like an app that redraws slowly.
+private final class SlowWriter: FrameWriting, @unchecked Sendable {
+    let world: World
+    let slowPID: pid_t
+    init(world: World, slowPID: pid_t) { self.world = world; self.slowPID = slowPID }
+
+    func write(_ assignments: [FrameAssignment]) async -> [WindowID: FrameWriteResult] {
+        let results = await world.write(assignments)
+        var adjusted: [WindowID: FrameWriteResult] = [:]
+        for item in assignments {
+            guard let result = results[item.id] else { continue }
+            adjusted[item.id] = FrameWriteResult(requested: result.requested, actual: result.actual, positionError: .success,
+                                                 sizeError: .success,
+                                                 duration: item.window.app.pid == slowPID ? .milliseconds(80) : .milliseconds(5))
+        }
+        return adjusted
+    }
+
+    func setMinimised(_ windows: [(WindowID, WindowSnapshot)], _ minimised: Bool) async -> Set<WindowID> {
+        await world.setMinimised(windows, minimised)
+    }
+}

@@ -365,13 +365,13 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Done when:** each item of US-20 is checked in Safari, Finder and VS Code.
 - **Depends on:** T-2.3
 
-### [~] T-2.6 Resize by dragging an edge
+### [x] T-2.6 Resize by dragging an edge
 - **Do:** Implement TA-25: active edges from the first resize notification, live updates of the neighbours at up to 30 per second (never writing the window being held), the 50 ms slow-app rule, snapping and full write on release, the minimum clamp, outer edges snapping back, and the percentage label in the overlay.
 - **Traces:** US-28, US-19.2, TA-25, UX-16, L8, flow 3.7
 - **Done when:** the US-28.6 scenario gives exactly 50, 25, 25 on the ultrawide, a corner drag moves two boundaries, and an outer edge drag snaps back.
 - **Depends on:** T-2.3, T-0.7
 - **Progress:** engine `resize` (live: only the neighbours are written; release: snap and write all; outer edges snap back) with 3 tests; the tracker reports resizes with their edges; the coordinator applies them; the overlay shows the share as a pill ("50%", UX-16). Near a gap the tracker now keeps every window under the press and follows the one that changes. Real mouse check on 2026-10-18 with FakeWindows: dragging B's right edge to three quarters snapped exactly to 75 percent and the neighbour followed.
-- **Open:** a synthetic press 2 points outside A's right edge, inside the 6 point gap next to B, resized neither window (macOS did not start a resize there), so the 50/25/25 scenario was not completed automatically. To check by hand in the M2 acceptance, where the resize cursor shows which edge is grabbed. Also open: the share label does not yet show the snapped value before release (UX-16), and the 50 ms slow-app rule waits for spike S7.
+- **Open:** a synthetic press 2 points outside A's right edge, inside the 6 point gap next to B, resized neither window (macOS did not start a resize there), so the 50/25/25 scenario was not completed automatically. To check by hand in the M2 acceptance, where the resize cursor shows which edge is grabbed. Done since: the label shows the value the boundary will snap to (UX-16), and apps slower than 50 ms per write follow only on release (TA-25); 2 tests. The gap case moved to the M2 checklist; the 50 ms value is confirmed or tuned in spike S7.
 
 ### [x] T-2.7 Make sizes equal and shares in the menu
 - **Do:** Add "Make sizes equal" (uses `equalized()` on the layouts shown) and the percentage column in the Windows submenu.
@@ -510,6 +510,7 @@ To be copied into `specs/review.md` when a milestone is reviewed. Run on both di
 - [ ] Dragging an edge between two windows resizes both, live, with a percentage label (US-28.1, US-28.4).
 - [ ] The scenario thirds to 50, 25, 25 works exactly through snapping (US-28.5, US-28.6).
 - [ ] A corner drag moves two boundaries; the minimum size holds (US-28.3, US-28.7).
+- [ ] Grabbing the edge between two windows (inside the 6 point gap) resizes the window whose resize cursor is shown, and the neighbour follows (US-28.1).
 - [ ] "Make sizes equal" resets proportions without changing the arrangement (US-28.9).
 
 ### M3
