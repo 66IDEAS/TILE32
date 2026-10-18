@@ -419,11 +419,12 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Progress (built early, in M0):** moved forward so that the owner's windows can always be restored before "Tile now" is switched on for them (UX-1 principle 2). Done: original frames recorded before the first move (TA-18), "Untile" menu item, windows minimised to make room brought back (US-24.8), frames moved into view when their display is gone (`DisplayTable.clampedIntoView`, US-24.3), layouts forgotten afterwards, status line "Windows restored - tiling paused". 3 new tests. Real check on 2026-10-18 with `--tile-then-untile-fakewindows` (FakeWindows only, limit 4): all six windows came back to their exact positions and sizes, including the two that had been minimised. Open for M1 and M3: the paused state after Untile (needs T-1.1), availability while paused, and windows on hidden Spaces restored on their next visit (US-24.7).
 - **Depends on:** T-1.5
 
-### [ ] T-3.4 Start at login
+### [~] T-3.4 Start at login
 - **Do:** The "Start at login" checkbox with `SMAppService.mainApp`, showing the system's real state and the "(approve in System Settings)" variant.
 - **Traces:** US-25, TA-17, UX-3
 - **Done when:** after switching it on and logging out and in, TILE32 is in the menu bar.
 - **Depends on:** T-0.10
+- **Progress:** checkbox with `SMAppService.mainApp`, showing the system's state, and the "(approve in System Settings)" variant that opens the login items settings. Not switched on by Claude, because it changes the owner's login items. Waiting for the owner: switch on, log out and in.
 
 ### [ ] T-3.5 Permission revoked
 - **Do:** When the permission disappears: stop all writes, reset the tracker, hide the overlay, release the observers, and show the warning menu. Resume without a restart when it returns.

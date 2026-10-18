@@ -1,5 +1,6 @@
 // The status item and its menu (architecture TA-17, UX-2, UX-3, UX-14).
 import AppKit
+import ServiceManagement
 import TileCore
 import TileEngine
 import TileLog
@@ -95,6 +96,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(untile)
         menu.addItem(.separator())
 
+        menu.addItem(startAtLoginItem())
         #if DEBUG
         menu.addItem(debugItem())
         #endif
@@ -173,6 +175,20 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               let bundleID = app.bundleIdentifier else { return nil }
         return MenuApp(bundleID: bundleID, name: app.localizedName ?? bundleID)
+    }
+
+    /// "Start at login" shows the system's real state; when macOS waits for approval, the
+    /// item says so and opens the login items settings (US-25, UX-3).
+    private func startAtLoginItem() -> NSMenuItem {
+        let status = SMAppService.mainApp.status
+        if status == .requiresApproval {
+            return ActionMenuItem(title: "Start at login (approve in System Settings)") {
+                SMAppService.openSystemSettingsLoginItems()
+            }
+        }
+        let item = ActionMenuItem(title: "Start at login") { [actions] in actions.toggleStartAtLogin() }
+        item.state = status == .enabled ? .on : .off
+        return item
     }
 
     /// One group per display with the choices 2 to 16 (UX-17).

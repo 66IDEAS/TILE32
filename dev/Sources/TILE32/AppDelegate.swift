@@ -1,5 +1,6 @@
 // Wires the modules together. Holds no layout logic (architecture TA-2, TA-17).
 import AppKit
+import ServiceManagement
 import TileAX
 import TileCore
 import TileEngine
@@ -72,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 untile: { [weak self] in self?.untileFromMenu() },
                 togglePause: { [weak self] in self?.togglePause() },
                 toggleExclude: { [weak self] app in self?.toggleExclude(app) },
+                toggleStartAtLogin: { Self.toggleStartAtLogin() },
                 openAccessibilitySettings: {
                     // Makes sure TILE32 is listed, then opens the pane directly (UX-5).
                     AccessibilityPermission.request()
@@ -261,6 +263,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.layout.info("Window limit for \(uuid, privacy: .public) set to \(value)")
         coordinator?.trigger("window limit changed")
         updateMenu()
+    }
+
+    /// US-25: registers or removes TILE32 as a login item.
+    private static func toggleStartAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+            Log.ui.info("Start at login: \(String(describing: service.status), privacy: .public)")
+        } catch {
+            Log.ui.error("Start at login failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// US-22: excluded windows float at once and the others re-flow; including them again

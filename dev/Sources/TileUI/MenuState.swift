@@ -94,6 +94,7 @@ public struct MenuActions {
     public var togglePause: @MainActor () -> Void
     /// Excludes the app, or tiles it again when it is already excluded (US-22).
     public var toggleExclude: @MainActor (MenuApp) -> Void
+    public var toggleStartAtLogin: @MainActor () -> Void
     public var openAccessibilitySettings: @MainActor () -> Void
     public var dumpLayoutTrees: @MainActor () -> Void
     public var logSpaces: @MainActor () -> Void
@@ -110,6 +111,7 @@ public struct MenuActions {
         untile: @escaping @MainActor () -> Void = {},
         togglePause: @escaping @MainActor () -> Void = {},
         toggleExclude: @escaping @MainActor (MenuApp) -> Void = { _ in },
+        toggleStartAtLogin: @escaping @MainActor () -> Void = {},
         openAccessibilitySettings: @escaping @MainActor () -> Void,
         dumpLayoutTrees: @escaping @MainActor () -> Void,
         logSpaces: @escaping @MainActor () -> Void = {},
@@ -125,6 +127,7 @@ public struct MenuActions {
         self.untile = untile
         self.togglePause = togglePause
         self.toggleExclude = toggleExclude
+        self.toggleStartAtLogin = toggleStartAtLogin
         self.openAccessibilitySettings = openAccessibilitySettings
         self.dumpLayoutTrees = dumpLayoutTrees
         self.logSpaces = logSpaces
