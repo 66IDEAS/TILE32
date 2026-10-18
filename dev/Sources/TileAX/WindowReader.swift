@@ -61,7 +61,11 @@ public enum WindowReader {
         await withTaskGroup(of: AppReadResult.self) { group in
             for app in apps {
                 group.addTask {
-                    await AXWorker.shared.run(for: app.pid) { read(app, windowNumber: windowNumber) }
+                    await firstResult(
+                        { await AXWorker.shared.run(for: app.pid) { read(app, windowNumber: windowNumber) } },
+                        orAfter: appDeadline,
+                        fallback: AppReadResult(app: app, windows: [], error: .cannotComplete, duration: appDeadline)
+                    )
                 }
             }
             var results: [AppReadResult] = []
@@ -69,6 +73,10 @@ public enum WindowReader {
             return results.sorted { $0.app.name.localizedStandardCompare($1.app.name) == .orderedAscending }
         }
     }
+
+    /// A reading never waits longer than this for one app. The app's own queue stays busy
+    /// until the app answers, but nothing else waits for it (TA-13).
+    public static let appDeadline: Duration = .milliseconds(1500)
 
     /// Blocking; runs on the app's queue.
     static func read(_ app: AppInfo, windowNumber: (AXUIElement) -> CGWindowID?) -> AppReadResult {
@@ -79,6 +87,9 @@ public enum WindowReader {
 
         let (error, elements) = AXRead.elements(appElement, kAXWindowsAttribute)
         let windows = elements.map { element in
+            // Window elements do not reliably inherit the timeout of the application element
+            // (found in T-0.16: a hung app blocked a reading for 8 seconds), so set it on each.
+            AXUIElementSetMessagingTimeout(element, AXWorker.messagingTimeout)
             let position = AXRead.point(element, kAXPositionAttribute)
             let size = AXRead.size(element, kAXSizeAttribute)
             return WindowSnapshot(
@@ -100,5 +111,42 @@ public enum WindowReader {
             Log.ax.info("\(app.name, privacy: .public) (pid \(app.pid)) did not list its windows: AXError \(error.rawValue)")
         }
         return AppReadResult(app: app, windows: windows, error: error, duration: duration)
+    }
+}
+
+/// Returns the work's result, or the fallback if the deadline passes first. The work keeps
+/// running in the background and its late result is dropped. Unstructured tasks are used on
+/// purpose: a task group would wait for the blocked work before returning.
+func firstResult<T: Sendable>(
+    _ work: @escaping @Sendable () async -> T,
+    orAfter deadline: Duration,
+    fallback: T
+) async -> T {
+    await withCheckedContinuation { continuation in
+        let once = ResumeOnce(continuation)
+        Task.detached { once.resume(with: await work()) }
+        Task.detached {
+            try? await Task.sleep(for: deadline)
+            once.resume(with: fallback)
+        }
+    }
+}
+
+/// Resumes a continuation exactly once, whichever side arrives first.
+private final class ResumeOnce<T: Sendable>: @unchecked Sendable {
+    // @unchecked: the continuation is only touched under the lock.
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Never>?
+
+    init(_ continuation: CheckedContinuation<T, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(with value: T) {
+        let pending: CheckedContinuation<T, Never>? = lock.withLock {
+            defer { continuation = nil }
+            return continuation
+        }
+        pending?.resume(returning: value)
     }
 }

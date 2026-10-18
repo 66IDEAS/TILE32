@@ -215,7 +215,7 @@ A resize made by the user with the mouse is handled by TA-25 and changes proport
 - **Main actor:** all UI (`TileUI`), the `NSEvent` monitors (`TileInput`), and the status item. It never calls AX functions in a loop and never waits for a reply.
 - **`actor LayoutEngine`:** the only owner of trees, the window registry, original frames, exclude list and run state. It is the single place where decisions are made. Everything else sends it events and receives commands.
 - **AX observer thread:** one dedicated thread with its own run loop, hosting all `AXObserver` sources. Callbacks only forward events.
-- **Per-app AX queues:** one serial dispatch queue per target process for blocking AX reads and writes. A hung or slow app blocks only its own queue. Each application element gets a messaging timeout (`AXUIElementSetMessagingTimeout`, default 0.5 seconds), and a timeout counts as "window unavailable" without crashing or stalling.
+- **Per-app AX queues:** one serial dispatch queue per target process for blocking AX reads and writes. A hung or slow app blocks only its own queue. Each application element and each window element gets a messaging timeout (`AXUIElementSetMessagingTimeout`, default 0.5 seconds), because window elements do not reliably inherit it from their application. On top of that, nothing waits longer than 1.5 seconds for one app: the waiting side gives up and treats the app as unavailable, while the app's own queue stays busy until it answers. A timeout counts as "window unavailable" without crashing or stalling.
 
 `AXUIElement` is not `Sendable`, so it is wrapped in an `@unchecked Sendable` box that is only used on the owning app's queue. Events and commands crossing actor boundaries are small immutable structs.
 

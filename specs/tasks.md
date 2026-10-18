@@ -112,11 +112,12 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** on macOS 27.0.1 (26A434) all four functions were found under their SkyLight names (`SLSMainConnectionID`, `SLSCopyManagedDisplaySpaces`, `SLSCopySpacesForWindows`, `_AXUIElementGetWindow`). The log shows the current Space of both displays. `FakeSpaceService` lives in `TileSpaces` so engine tests can use it; 6 parser and mapping tests in the new `TileSpacesTests` target. Done 2026-10-18.
 - **Depends on:** T-0.8, T-0.9
 
-### [~] T-0.14 TileAX: access layer and window registry
+### [x] T-0.14 TileAX: access layer and window registry
 - **Do:** Implement the AX observer thread with its own run loop, one serial queue per app, `AXUIElementSetMessagingTimeout` (0.5 s), the `@unchecked Sendable` element box, discovery of regular apps, reading windows and their attributes (role, subrole, title, frame, minimised, full screen, modal, size settable), and a registry keyed by `CGWindowID` (from T-0.13), with `CFEqual` as the fallback key.
 - **Traces:** TA-9, TA-13, TA-20, N-3, N-5
 - **Done when:** "Dump layout trees" lists every window of the running apps with its `CGWindowID`, display and Space, and a deliberately hung test app does not freeze TILE32.
-- **Progress:** `AXWorker` (queue per app, 0.5 s timeout, observer thread), `WindowReader`, `AXElementBox`, `WindowRegistry` and `WindowScan`. Debug builds can be started with `--dump-windows` to log every window and quit, so readings can be checked without opening menus. First reading on 2026-10-18: 31 windows in 37 apps in 662 ms, each with window number, display and Space (`specs/spikes.md`, S3). Open: the hung-app check, which needs the hang button of FakeWindows (T-0.16).
+- **Progress:** `AXWorker` (queue per app, 0.5 s timeout, observer thread), `WindowReader`, `AXElementBox`, `WindowRegistry` and `WindowScan`. Debug builds can be started with `--dump-windows` to log every window and quit, so readings can be checked without opening menus. First reading on 2026-10-18: 31 windows in 37 apps in 662 ms, each with window number, display and Space (`specs/spikes.md`, S3). Hung-app check passed on 2026-10-18 after a fix (see below). Done.
+- **Errors found:** with FakeWindows frozen, a reading waited 8 seconds instead of 0.5: window elements did not inherit the messaging timeout of the application element, and the scan waited for every app. Fixed: the timeout is set on every window element, and a reading gives up on any app after 1.5 seconds (`firstResult`, with 2 tests). Re-run: the frozen app was given up after 0.52 seconds and the whole scan took 1.5 seconds. TILE32 itself never froze. Resolved 2026-10-18.
 - **Depends on:** T-0.12, T-0.13
 
 ### [x] T-0.15 Window classification, first version
@@ -126,10 +127,11 @@ Goal: prove that TILE32 can see and arrange windows, answer the two highest risk
 - **Result:** `WindowClassifier` in `TileEngine` with 10 unit tests; the dump shows the classification of every window. Real reading on 2026-10-18: 27 tiled, 1 minimised, floating: 1 dialog, 3 panels (two small helper windows and the Finder desktop window, which has no subrole and no window number), 1 not resizable. Excluded apps are already supported by the classifier and get their menu in T-3.2. Sheets and save panels are checked with FakeWindows in T-0.16. Done 2026-10-18.
 - **Depends on:** T-0.14
 
-### [ ] T-0.16 FakeWindows test app
+### [x] T-0.16 FakeWindows test app
 - **Do:** Build the SwiftUI test app with buttons that open: a normal window, a window with a minimum size, a window that appears after a delay, five windows at once, a dialog, a sheet, a window that resizes itself, and a full-screen toggle.
 - **Traces:** TA-24, US-10, US-11, US-21, US-30
 - **Done when:** `./build-app.sh FakeWindows` produces a signed app, and each button behaves as labelled.
+- **Result:** built with AppKit (simpler than SwiftUI for these window types). Twelve cases: normal, minimum size, delayed, five at once, splash, dialog, sheet, tool panel, save panel, resizes itself, full screen, hang. Every case can also be started from the command line (`--open`, `--hang-after`, `--hang-seconds`, `--quit-after`); scripted runs stay in the background and never take the keyboard focus. Used for the hung-app check of T-0.14. Done 2026-10-18.
 - **Depends on:** T-0.2
 
 ### [ ] T-0.17 Spike tools for Spaces and window listing (S6, S3)

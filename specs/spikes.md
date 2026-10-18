@@ -44,3 +44,10 @@ From the first full reading in T-0.14 (debug dump mode, no window moved). Window
 ## Observation for open question Q-3 (2026-10-18)
 
 The owner's current desktop holds **27 windows that would be tiled**, spread over both displays (most on the ultrawide). As equal columns, 25 windows on the 5120 point wide display would give tiles of about 200 points, the minimum of rule L8, which is not usable. Q-3 ("how many windows can one display hold") therefore matters before "Tile now" (T-0.24) arranges real windows. Options to put to the owner: tile only the windows of the frontmost apps, tile at most a fixed number per display and leave the rest floating, or fill a grid instead of columns when there are many windows.
+
+## FakeWindows observations (2026-10-18)
+
+- A floating tool panel (`NSPanel` with the utility style) reports the subrole `AXStandardWindow`, but it is not resizable, so it floats as "not resizable". The classification is right, the reason shown is not the most natural one; to revisit in T-3.1.
+- A sheet is not listed as a window of its own; it belongs to its parent window, as TA-10 assumed.
+- A save panel opened by `NSSavePanel.begin` did not appear in the window list during the reading. To check again in T-3.1.
+- A frozen app is now given up after 0.5 to 1.5 seconds (task T-0.14).
