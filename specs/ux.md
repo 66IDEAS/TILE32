@@ -171,7 +171,7 @@ Choosing "Open Accessibility settings..." opens the Accessibility pane of System
 - Each entry is "App - window title". Long titles are cut in the middle with "...", at about 48 characters.
 - Choosing an entry brings that window to the front (US-3.4).
 - A window that cannot be made small enough shows "(does not fit)" after its name.
-- Floating windows are listed together under "Floating", each with the reason in brackets: dialog, panel, excluded app, full screen, too small, not resizable.
+- Floating windows are listed together under "Floating", each with the reason in brackets: dialog, panel, pop-up window, excluded app, full screen, too small, not resizable.
 - With no windows the submenu shows one grey line: "No windows to arrange".
 - The submenu stays available while tiling is paused, and is grey while the permission is missing.
 
@@ -354,7 +354,7 @@ A status line text stays until the state changes. It is not timed, so there is n
 | Window limit | Menu item (submenu) |
 | Tiling 18 windows on 2 displays - 15 minimised to make room | Status line |
 | Floating | Header in the "Windows" submenu |
-| (floating: dialog), (floating: panel), (floating: excluded app), (floating: full screen), (floating: too small), (floating: not resizable) | Suffixes in the "Windows" submenu |
+| (floating: dialog), (floating: panel), (floating: excluded app), (floating: full screen), (floating: too small), (floating: not resizable), (floating: pop-up window) | Suffixes in the "Windows" submenu |
 | Swap places | Overlay label |
 | Place on the left | Overlay label |
 | Place on the right | Overlay label |

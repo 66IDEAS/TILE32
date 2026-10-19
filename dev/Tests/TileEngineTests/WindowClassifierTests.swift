@@ -73,6 +73,15 @@ struct WindowClassifierTests {
         #expect(WindowClassifier.classify(window(bundleID: "com.apple.Safari"), excludedBundleIDs: excluded) == .tiled)
     }
 
+    @Test func outlookMainWindowsAreTiledAndItsOtherWindowsFloat() {
+        let outlook = "com.microsoft.Outlook"
+        #expect(WindowClassifier.classify(window(bundleID: outlook, identifier: "OutlookWindow")) == .tiled)
+        #expect(WindowClassifier.classify(window(bundleID: outlook)) == .floating(.popUp))
+        #expect(WindowClassifier.classify(window(bundleID: outlook, identifier: "something-else")) == .floating(.popUp))
+        // Other apps are not affected by the rule.
+        #expect(WindowClassifier.classify(window(bundleID: "com.apple.mail")) == .tiled)
+    }
+
     @Test(arguments: ["save-panel", "open-panel"])
     func openAndSavePanelsFloatAsDialogsEvenWhenResizable(identifier: String) {
         #expect(WindowClassifier.classify(window(identifier: identifier)) == .floating(.dialog))

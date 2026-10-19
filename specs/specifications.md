@@ -357,6 +357,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 2. They stay floating, in front of their parent window, and never cause a re-layout when they appear or close.
 3. The decision is made automatically for each window, without the user doing anything.
 4. A window that is wrongly treated as floating can be forced into the layout, and a window that is wrongly tiled can be floated, through the per-app exclude list (US-22).
+5. Pop-up windows of apps whose main windows are known also float: in Outlook, a new email, a new event or a message opened on its own floats, while the mail and calendar windows are tiled. Such a window never causes a re-layout (added on 2026-10-19 at the owner's request).
 
 #### US-22 Exclude apps
 

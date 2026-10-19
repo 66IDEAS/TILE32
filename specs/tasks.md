@@ -416,6 +416,7 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Done when:** the FakeWindows dialog, sheet and tool window never take a tile, and their reasons are shown correctly.
 - **Depends on:** T-1.12
 - **Result:** classification runs on every reconcile, so windows that change nature are re-classified at once; sheets belong to their parent window and never take a tile; open and save panels report an ordinary standard window but carry the identifier "save-panel" or "open-panel" and now float as dialogs even when resizable (found with FakeWindows, 2 tests); every floating reason of UX-6 is shown in the Windows submenu. Done 2026-10-18.
+- **Errors found:** in the owner's use on 2026-10-19, a new email in Outlook joined the layout and everything re-flowed. Outlook's mail and calendar windows carry the Accessibility identifier "OutlookWindow"; the new email window has none (read on the owner's Mac, without titles). Fixed: `WindowClassifier.mainWindowIdentifiers` names the main windows of such apps, and every other window of the app floats as "pop-up window" (US-21.5). 1 test. Resolved 2026-10-19; the new calendar invite is to be checked by the owner.
 
 ### [~] T-3.2 Exclude apps
 - **Do:** Add "Don't tile <app>" / "Tile <app> again" / "Don't tile an app", and the "Excluded apps" submenu with its header and empty state. Store bundle identifiers in `UserDefaults`.
@@ -431,6 +432,7 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Progress (built early, in M0):** moved forward so that the owner's windows can always be restored before "Tile now" is switched on for them (UX-1 principle 2). Done: original frames recorded before the first move (TA-18), "Untile" menu item, windows minimised to make room brought back (US-24.8), frames moved into view when their display is gone (`DisplayTable.clampedIntoView`, US-24.3), layouts forgotten afterwards, status line "Windows restored - tiling paused". 3 new tests. Real check on 2026-10-18 with `--tile-then-untile-fakewindows` (FakeWindows only, limit 4): all six windows came back to their exact positions and sizes, including the two that had been minimised. Open for M1 and M3: the paused state after Untile (needs T-1.1), availability while paused, and windows on hidden Spaces restored on their next visit (US-24.7).
 - **Depends on:** T-1.5
 - **Result:** pause after Untile, availability while paused (grey only when nothing is left to restore), and the status line were built in M1. Windows on hidden desktops are restored at once through the element TILE32 read while they were visible (session A showed that such writes work); only a window TILE32 never saw would wait for its next visit (US-24.7). Done 2026-10-18.
+
 
 ### [~] T-3.4 Start at login
 - **Do:** The "Start at login" checkbox with `SMAppService.mainApp`, showing the system's real state and the "(approve in System Settings)" variant.

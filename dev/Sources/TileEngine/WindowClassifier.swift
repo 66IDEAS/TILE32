@@ -11,6 +11,8 @@ public enum FloatReason: String, Sendable, Equatable, CaseIterable {
     case fullScreen = "full screen"
     case tooSmall = "too small"
     case notResizable = "not resizable"
+    /// A further window of an app whose main windows are known, for example a new email.
+    case popUp = "pop-up window"
 }
 
 public enum Classification: Sendable, Equatable {
@@ -28,6 +30,13 @@ public enum WindowClassifier {
     /// Open and save panels report an ordinary standard window, but carry these
     /// identifiers (found in T-3.1 with FakeWindows).
     private static let dialogIdentifiers: Set<String> = ["save-panel", "open-panel"]
+    /// Apps whose main windows carry an identifier. Every other window of such an app floats
+    /// as a pop-up window. Outlook marks its mail and calendar windows "OutlookWindow"; a new
+    /// email, a new event or a message opened on its own has no identifier (found on the
+    /// owner's Mac on 2026-10-19: a new email joined the layout and everything re-flowed).
+    static let mainWindowIdentifiers: [String: Set<String>] = [
+        "com.microsoft.Outlook": ["OutlookWindow"],
+    ]
 
     /// Rule 1 (regular apps only) is applied by discovery: other apps are never read.
     public static func classify(_ window: WindowSnapshot, excludedBundleIDs: Set<String> = []) -> Classification {
@@ -38,6 +47,10 @@ public enum WindowClassifier {
         if window.isFullScreen { return .floating(.fullScreen) }
         if window.isModal || dialogSubroles.contains(window.subrole ?? "") || dialogIdentifiers.contains(window.identifier ?? "") {
             return .floating(.dialog)
+        }
+        if let bundleID = window.app.bundleID, let main = mainWindowIdentifiers[bundleID],
+           !main.contains(window.identifier ?? "") {
+            return .floating(.popUp)
         }
         // Rule 2: only standard windows. Floating panels, sheets, popovers and unknown
         // helper windows all fall out here.
