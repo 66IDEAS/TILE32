@@ -260,17 +260,60 @@ struct ReconcileTests {
         #expect(ids(await engine.trees[key2]) == [1, 2, 3])
     }
 
-    @Test func disconnectedDisplayDropsItsLayout() async {
+    @Test func disconnectedDisplayKeepsItsLayoutUntilItReturns() async {
         let world = World()
         world.add(1, x: 100); world.add(9, x: -1000, y: 400, width: 600)
         let engine = LayoutEngine(writer: world)
         _ = await engine.reconcile(world.observe())
-        #expect(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)] != nil)
-        // macOS moves the laptop's window onto the remaining display.
+        let laptopKey = LayoutKey(space: SpaceID(4), display: laptop)
+        let laptopTile = world.window(9)!.frame
+        // macOS moves the laptop's window onto the remaining display; it joins there.
         world.update(9) { $0.frame = CGRect(x: 300, y: 300, width: 600, height: 600) }
         _ = await engine.reconcile(world.observe(displays: onlyDell))
-        #expect(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)] == nil)
         #expect(ids(await engine.trees[key2]) == [1, 9])
+        // The laptop's layout waits for the laptop.
+        #expect(ids(await engine.trees[laptopKey]) == [9])
+        // The laptop comes back and macOS moves the window back: it takes its old tile again.
+        world.update(9) { $0.frame = laptopTile.offsetBy(dx: 40, dy: 20) }
+        _ = await engine.reconcile(world.observe())
+        #expect(ids(await engine.trees[key2]) == [1])
+        #expect(ids(await engine.trees[laptopKey]) == [9])
+        #expect(world.window(9)!.frame == laptopTile)
+    }
+
+    @Test func displaysOfflineDuringALockChangeNothing() async {
+        let world = World()
+        for n in 1...8 { world.add(UInt64(n), x: CGFloat(n) * 500) }
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        _ = await engine.drop(WindowID(3), at: CGPoint(x: 5100, y: 700), displays: bothDisplays,
+                             currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let before = await engine.trees[key2]
+        // While locked, macOS reports no displays for a moment.
+        _ = await engine.reconcile(world.observe(displays: DisplayTable(screens: [])))
+        let summary = await engine.reconcile(world.observe())
+        #expect(await engine.trees[key2] == before)
+        #expect(summary.written == 0)
+    }
+
+    @Test func rememberedLayoutServesEveryFirstVisit() async {
+        let world = World()
+        for n in 1...4 { world.add(UInt64(n), x: CGFloat(n) * 900) }
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        let notes = world.window(4)!.frame
+        _ = await first.drop(WindowID(1), at: CGPoint(x: notes.midX, y: notes.midY), displays: bothDisplays,
+                             currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let stored = await first.exportLayouts(world.observe())
+        let second = LayoutEngine(writer: world)
+        await second.importLayouts(stored)
+        _ = await second.reconcile(world.observe())
+        // The layout is lost again later and the windows got shuffled meanwhile.
+        await second.setTree(LayoutTree(), for: key2)
+        await second.forgetTree(key2)
+        for n in 1...4 { world.update(UInt64(n)) { $0.frame = CGRect(x: CGFloat(n) * 300, y: 200, width: 900, height: 700) } }
+        _ = await second.reconcile(world.observe())
+        #expect(ids(await second.trees[key2]) == [4, 2, 3, 1])
     }
 
     @Test func windowMovedAwayIsPutBackOnceOnly() async {

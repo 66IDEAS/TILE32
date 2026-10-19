@@ -59,6 +59,17 @@ public final class TilingCoordinator {
     private var lastObservation: Observation?
     private var writeRetryPending = false
     private var midSwitchHolds = 0
+    /// While the screen is locked, the displays sleep or another user is active, macOS takes
+    /// displays offline and moves windows around; nothing is read or written then. After that
+    /// TILE32 waits `screenReturnDelay` before it reads again (found on 2026-10-19: after an
+    /// unlock the windows of desktop 2 were arranged afresh).
+    private var screenLocked = false
+    private var screensAsleep = false
+    private var sessionInactive = false
+    private var readAgainAfter: ContinuousClock.Instant = .now - .seconds(10)
+    private var distributedObservers: [NSObjectProtocol] = []
+    static let screenReturnDelay: Duration = .seconds(2)
+    private var screenUnavailable: Bool { screenLocked || screensAsleep || sessionInactive }
     /// The last drag or resize step. Between the mouse-up and the drop taking the lock, a
     /// layout run must not start, or it puts the dragged window back first (found on
     /// 2026-10-19). Cleared when the gesture ends; ignored after `gestureTimeout` in case an
@@ -113,11 +124,47 @@ public final class TilingCoordinator {
             })
         }
 
+        let screenNames: [NSNotification.Name] = [
+            NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
+            NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification,
+        ]
+        for name in screenNames {
+            workspaceObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screenStateChanged(name) }
+            })
+        }
+        let distributed = DistributedNotificationCenter.default()
+        for name in ["com.apple.screenIsLocked", "com.apple.screenIsUnlocked"].map({ NSNotification.Name($0) }) {
+            distributedObservers.append(distributed.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screenStateChanged(name) }
+            })
+        }
+
         let timer = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollWindowServer() }
         }
         RunLoop.main.add(timer, forMode: .common)
         pollTimer = timer
+    }
+
+    private func screenStateChanged(_ name: NSNotification.Name) {
+        let wasUnavailable = screenUnavailable
+        switch name.rawValue {
+        case "com.apple.screenIsLocked": screenLocked = true
+        case "com.apple.screenIsUnlocked": screenLocked = false
+        case NSWorkspace.screensDidSleepNotification.rawValue: screensAsleep = true
+        case NSWorkspace.screensDidWakeNotification.rawValue: screensAsleep = false
+        case NSWorkspace.sessionDidResignActiveNotification.rawValue: sessionInactive = true
+        case NSWorkspace.sessionDidBecomeActiveNotification.rawValue: sessionInactive = false
+        default: break
+        }
+        if screenUnavailable != wasUnavailable {
+            Log.engine.info("Screen \(self.screenUnavailable ? "unavailable (locked, asleep or another user): tiling waits" : "available again", privacy: .public)")
+        }
+        if wasUnavailable, !screenUnavailable {
+            readAgainAfter = .now + Self.screenReturnDelay
+            trigger("screen available again")
+        }
     }
 
     private func handle(_ event: WindowEvent) {
@@ -169,6 +216,12 @@ public final class TilingCoordinator {
             guard let first = firstTrigger, let last = lastTrigger else { return }
             let now = ContinuousClock.now
             if now - last < Self.quietTime, now - first < Self.longestWait {
+                scheduleCheck()
+                return
+            }
+            // Nothing while the screen is locked or asleep; it is read once it is back.
+            if screenUnavailable { return }
+            if now < readAgainAfter {
                 scheduleCheck()
                 return
             }
@@ -252,6 +305,7 @@ public final class TilingCoordinator {
         var all = layoutStore.load()
         for (key, value) in await engine.exportLayouts(observation) { all[key] = value }
         layoutStore.save(all)
+        await engine.importLayouts(all)
     }
 
     /// One reading of the shown desktops: windows, Spaces, order of use, unanswered and
@@ -407,5 +461,7 @@ public final class TilingCoordinator {
         events?.unwatchAll()
         for observer in workspaceObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         workspaceObservers.removeAll()
+        for observer in distributedObservers { DistributedNotificationCenter.default().removeObserver(observer) }
+        distributedObservers.removeAll()
     }
 }

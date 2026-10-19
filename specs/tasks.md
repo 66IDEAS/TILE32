@@ -283,7 +283,9 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Traces:** US-9, TA-16, flow 3.5, N-5
 - **Done when:** unplugging and replugging the ultrawide leaves every window visible, and windows do not jump back on their own.
 - **Depends on:** T-1.5
-- **Progress:** layouts of a disconnected display are dropped, and its windows join the remaining display (test).
+- **Progress:** windows of a disconnected display join the remaining display (test); since 2026-10-19 its layouts stay until it returns (see below).
+- **Errors found:** in the owner's use on 2026-10-19, the windows of desktop 2 were arranged afresh after the Mac had been locked. While the screen is locked, macOS takes the displays offline; a layout run in that time dropped the layouts of the missing displays (silently, nothing was written), and at the unlock (18:29:38, read 1.4 seconds later) the laptop's layout was read back from the screen while the Dell's windows were no tiling and the remembered layout had already been used once at the start, so the Dell was arranged afresh. Fixed: (1) no layout run while the screen is locked, the displays sleep or another user is active, and 2 seconds of waiting afterwards; (2) layouts of a display that is not connected stay, dormant, and its windows take their old tiles when macOS moves them back (US-9.5; replaces "layouts of a disconnected display are dropped"); (3) remembered layouts serve every first visit, not only the first one after a start, and stay current after each save; (4) kept layouts of missing displays and fresh arrangements of a first visit are logged. 3 tests.
+
 
 ### [x] T-1.10 Windows that cannot shrink
 - **Do:** After writing, compare the read-back size. Mark windows that stay larger as "does not fit", anchor them at the top-left of the tile, retry once, then leave them alone until their tile changes. Show the count next to the icon and in the status line, and "(does not fit)" in the Windows submenu.

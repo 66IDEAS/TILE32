@@ -154,6 +154,7 @@ Goal: windows arrange themselves as they come and go, with a separate, remembere
 2. When a display is disconnected, its windows move to a remaining display and join that display's layout following rule L3.
 3. When the same display is reconnected, windows do not jump back on their own.
 4. A display change never leaves a window off-screen or unreachable.
+5. A display that is offline for a while, for example while the screen is locked or the displays sleep, keeps its layouts. When it returns and macOS moves its windows back, they take their old tiles again. TILE32 reads and writes nothing while the screen is locked, the displays sleep or another user is active (added on 2026-10-19 after windows were rearranged by an unlock).
 
 #### US-10 Windows that cannot shrink
 

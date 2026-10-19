@@ -132,9 +132,15 @@ extension LayoutEngine {
         return result
     }
 
-    /// Layouts from the last run, used once for each layout's first visit (US-26).
+    /// The remembered layouts, offered to every first visit of a layout (US-26). The
+    /// coordinator passes them again after every save, so they stay current.
     public func importLayouts(_ layouts: StoredLayouts) {
         storedLayouts = layouts
+    }
+
+    /// Forgets one layout; for tests of a later first visit.
+    func forgetTree(_ key: LayoutKey) {
+        trees[key] = nil
     }
 
     /// Replaces one layout; for tests that need a structure no drop produces.
@@ -189,7 +195,7 @@ extension LayoutEngine {
     /// The stored layout for a first visit, matched to the observed windows, or nil.
     func restoredTree(for key: LayoutKey, space: SpaceInfo?, observed: [WindowRecord]) -> LayoutTree? {
         guard let space, !space.uuid.isEmpty,
-              let stored = storedLayouts.removeValue(forKey: "\(space.uuid)/\(key.display.uuid)") else { return nil }
+              let stored = storedLayouts["\(space.uuid)/\(key.display.uuid)"] else { return nil }
         let tree = Descriptors.restore(stored, Descriptors.make(observed))
         return tree.isEmpty ? nil : tree
     }

@@ -125,6 +125,8 @@ public actor LayoutEngine {
     var windowPIDs: [WindowID: pid_t] = [:]
     /// Layouts from the last run of TILE32, used once per layout (US-26).
     var storedLayouts: StoredLayouts = [:]
+    /// Displays that have layouts but are not connected right now (logged once per change).
+    var missingDisplays: Set<DisplayID> = []
     /// The last write durations per app, for the slow-app rule of live resizing (TA-25).
     var writeDurations: [pid_t: [Duration]] = [:]
     /// Apps slower than this on average over their last five writes do not follow a live

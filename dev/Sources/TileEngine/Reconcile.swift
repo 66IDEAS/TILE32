@@ -78,8 +78,17 @@ extension LayoutEngine {
         let rank = Dictionary(observation.recency.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         func lastUsed(_ id: WindowID) -> Int { rank[id] ?? .max }
 
-        // Layouts of displays that are gone are dropped; their windows show up elsewhere (US-9).
-        trees = trees.filter { observation.displays.display(id: $0.key.display) != nil }
+        // Layouts of displays that are not connected stay, dormant, until the display comes
+        // back (US-9). Their windows show up on the remaining display and join it there.
+        // Dropping them lost every layout during a screen lock, when macOS takes the
+        // displays offline for a moment (found on 2026-10-19).
+        let missing = Set(trees.keys.map(\.display)).filter { observation.displays.display(id: $0) == nil }
+        if missing != missingDisplays {
+            if !missing.isEmpty {
+                Log.layout.info("Displays not connected, their layouts are kept: \(missing.map(\.uuid).sorted().joined(separator: ", "), privacy: .public)")
+            }
+            missingDisplays = missing
+        }
 
         var records: [WindowID: WindowRecord] = [:]
         var classes: [WindowID: Classification] = [:]
@@ -128,6 +137,9 @@ extension LayoutEngine {
             guard !rebuild, var tree = trees[key] else {
                 // First visit, or "Tile now": a fresh arrangement with the limit.
                 guard !observed.isEmpty else { trees[key] = nil; continue }
+                if !rebuild {
+                    Log.layout.info("First visit of \(key.description, privacy: .public): arranged afresh")
+                }
                 let byUse = observed.sorted { (lastUsed($0.id), $0.id.raw) < (lastUsed($1.id), $1.id.raw) }
                 let members = Set(byUse.prefix(limit).map(\.id))
                 toMinimise += byUse.dropFirst(limit).map { ($0.id, $0.snapshot, key) }
