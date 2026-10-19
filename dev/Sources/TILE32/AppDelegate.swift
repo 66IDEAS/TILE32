@@ -275,6 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             coordinator?.setState(.paused)
             runStateStore.setPaused(true)
             _ = await engine.untile(displays: displayTable)
+            await coordinator?.forgetLayouts()
             showRestoredMessage = true
             updateMenu()
         }

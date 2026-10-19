@@ -211,10 +211,8 @@ public final class TilingCoordinator {
             }
             midSwitchHolds = 0
             lastObservation = observation
-            if summary.changedAnything {
-                lastWrite = .now
-                await saveLayouts(observation)
-            }
+            if summary.changedAnything { lastWrite = .now }
+            if summary.changedAnything || summary.layoutsChanged { await saveLayouts(observation) }
             if summary.minimised > 0 || summary.restored > 0 || summary.arrived > 0 { lastAnimation = .now }
             lastSummary = summary
             onChange()
@@ -240,6 +238,13 @@ public final class TilingCoordinator {
     public func restoreLayouts() async {
         guard let layoutStore else { return }
         await engine.importLayouts(layoutStore.load())
+    }
+
+    /// Forgets the remembered layouts, after "Untile" (US-24): the next start takes the
+    /// windows as they are.
+    public func forgetLayouts() async {
+        await engine.forgetStoredLayouts()
+        layoutStore?.save([:])
     }
 
     private func saveLayouts(_ observation: Observation) async {
@@ -351,6 +356,7 @@ public final class TilingCoordinator {
         let snapshots = Dictionary(observation.records.map { ($0.id, $0.snapshot) }, uniquingKeysWith: { first, _ in first })
         _ = await engine.equalizeShown(displays: observation.displays, currentSpaces: observation.currentSpaces, snapshots: snapshots)
         lastWrite = .now
+        await saveLayouts(observation)
         onChange()
     }
 
@@ -362,8 +368,11 @@ public final class TilingCoordinator {
 
     /// "Tile now" while running: arranges afresh and keeps tiling (US-4.6).
     public func tileNow() async -> ReconcileSummary {
-        let summary = await engine.reconcile(await observe(), limits: limits(), excludedBundleIDs: excludedBundleIDs(), rebuild: true)
+        let observation = await observe()
+        let summary = await engine.reconcile(observation, limits: limits(), excludedBundleIDs: excludedBundleIDs(), rebuild: true)
         lastWrite = .now
+        lastObservation = observation
+        await saveLayouts(observation)
         lastSummary = summary
         onChange()
         await scheduleWriteRetry()

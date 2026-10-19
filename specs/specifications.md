@@ -407,14 +407,18 @@ Goal: make TILE32 safe and pleasant for every day use.
 
 #### US-26 Remember my layout
 
-**Description:** As a user, I want my arrangement to survive a restart of TILE32 for windows that are still open.
+**Description:** As a user, I want my windows to stay exactly where they are when TILE32 restarts, and to go back to their places after the computer restarts.
 
 **Acceptance criteria:**
-1. When TILE32 is quit and started again while the same windows are open, the layout of each Space and display is restored, including proportions, as far as the windows can be recognised.
-2. Windows that cannot be recognised are added following rule L3.
-3. Entries for windows that no longer exist are dropped silently.
+1. When TILE32 is quit and started again while the same windows are open, no window moves: the layout of each Space and display, including proportions, comes back as it was.
+2. This holds also without any remembered data: when the windows on a desktop already form a tiling, TILE32 reads the layout back from their positions.
+3. After a restart of the computer, windows that can be recognised (same app, same title, or same position among the app's windows) go back to their remembered places in the layout of their Space and display.
+4. Windows that cannot be recognised are added following rule L3.
+5. Entries for windows that no longer exist are dropped silently.
+6. TILE32 never moves a window to another Space (C-10). After a restart of the computer, macOS decides on which Space each window opens; TILE32 arranges each Space when it is first shown.
+7. Every change of a layout is remembered at once, also changes that move no window (for example a new tab). "Untile" forgets the remembered layouts.
 
-*Note: this story is a candidate. See open question Q-4.*
+*Decided by the owner on 2026-10-19: US-26 is kept and extended (Q-4, OQ-7).*
 
 #### US-27 Permission revoked or lost
 
@@ -482,7 +486,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 | # | Question | Suggested default |
 |---|---|---|
 | Q-2 | Where should a new window go: always at the right end (as in the prototype), or next to the window that has focus? | Right end, as in the prototype. |
-| Q-4 | Should the layout be remembered across restarts of TILE32 (US-26), and how well can windows be recognised after a restart? | Keep US-26 as a candidate for the end of Milestone 3. |
+| Q-4 | (Answered 2026-10-19.) Remember layouts across restarts? Yes: the owner wants windows to stay where they are after a restart of TILE32 and to go back to their places after a restart of the computer (US-26). | Answered |
 | Q-6 | Should "Quit TILE32" offer to untile first? | No. Windows stay where they are, and the user can use "Untile" before quitting. |
 | Q-7 | Should pause be per display or global? | Global. |
 | Q-8 | Should an app with several windows get one tile per window, or one tile per app? | One tile per window. |

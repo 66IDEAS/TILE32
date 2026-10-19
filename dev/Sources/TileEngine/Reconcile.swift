@@ -51,6 +51,9 @@ public struct ReconcileSummary: Sendable, Equatable {
     public var restored = 0
     /// The reading mixed two desktops and nothing was changed; read again shortly.
     public var heldMidSwitch = false
+    /// A layout changed, also without any window moving (a tab replaced, a first visit
+    /// taken from the screen). Remembered layouts are saved after such a run.
+    public var layoutsChanged = false
 
     public var changedAnything: Bool { written > 0 || minimised > 0 || restored > 0 }
 }
@@ -66,6 +69,7 @@ extension LayoutEngine {
         acceptMidSwitch: Bool = false
     ) async -> ReconcileSummary {
         var summary = ReconcileSummary()
+        let treesBefore = trees
         if !acceptMidSwitch, let reason = midSwitchReason(observation) {
             Log.layout.info("Reading mixes two desktops (\(reason, privacy: .public)), waiting")
             summary.heldMidSwitch = true
@@ -109,10 +113,12 @@ extension LayoutEngine {
                 .sorted { ($0.snapshot.frame?.minX ?? 0, $0.id.raw) < ($1.snapshot.frame?.minX ?? 0, $1.id.raw) }
             let observedIDs = Set(observed.map(\.id))
 
-            // First visit after a restart: the stored arrangement, as far as windows match (US-26).
+            // First visit: the arrangement on screen or the remembered one, so nothing jumps
+            // after a restart (US-26). Windows not in it join as new windows.
             if !rebuild, trees[key] == nil, !observed.isEmpty,
-               let restored = restoredTree(for: key, space: space, observed: observed) {
-                var tree = restored
+               let (first, source) = firstVisitTree(for: key, space: space, display: display, observed: observed) {
+                Log.layout.info("First visit of \(key.description, privacy: .public): \(source, privacy: .public)")
+                var tree = first
                 for record in observed where !tree.contains(record.id) {
                     tree = tree.appending(record.id, availableWidth: display.usableArea.width - Self.gap)
                 }
@@ -223,6 +229,7 @@ extension LayoutEngine {
                 \(summary.minimised) minimised, \(summary.restored) brought back
                 """)
         }
+        summary.layoutsChanged = trees != treesBefore
         return summary
     }
 

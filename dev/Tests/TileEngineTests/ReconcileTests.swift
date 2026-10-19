@@ -28,6 +28,7 @@ private final class World: FrameWriting, @unchecked Sendable {
     struct Window {
         var pid: pid_t = 100
         var bundleID = "com.example.app"
+        var title = ""
         var frame: CGRect
         var space: SpaceID = SpaceID(4)
         var minimised = false
@@ -48,9 +49,10 @@ private final class World: FrameWriting, @unchecked Sendable {
     var writes: Int { lock.withLock { _writes } }
 
     func add(_ number: UInt64, x: CGFloat, y: CGFloat = 300, width: CGFloat = 800, pid: pid_t = 100,
-             space: SpaceID = SpaceID(4), minimumSize: CGSize = .zero) {
+             space: SpaceID = SpaceID(4), minimumSize: CGSize = .zero, bundleID: String = "com.example.app", title: String = "") {
         lock.withLock {
-            windows[number] = Window(pid: pid, frame: CGRect(x: x, y: y, width: width, height: 600), space: space, minimumSize: minimumSize)
+            windows[number] = Window(pid: pid, bundleID: bundleID, title: title,
+                                     frame: CGRect(x: x, y: y, width: width, height: 600), space: space, minimumSize: minimumSize)
         }
     }
 
@@ -70,7 +72,7 @@ private final class World: FrameWriting, @unchecked Sendable {
             let snap = WindowSnapshot(
                 app: AppInfo(pid: window.pid, bundleID: window.bundleID, name: "App \(window.pid)"),
                 element: AXElementBox(AXUIElementCreateApplication(pid_t(number))),
-                windowNumber: CGWindowID(number), role: "AXWindow", subrole: "AXStandardWindow", title: "",
+                windowNumber: CGWindowID(number), role: "AXWindow", subrole: "AXStandardWindow", title: window.title,
                 frame: window.frame, isMinimized: window.minimised, isFullScreen: window.fullScreen,
                 isModal: false, isResizable: true)
             return WindowRecord(id: WindowID(number), snapshot: snap,
@@ -893,6 +895,71 @@ struct StoredLayoutTests {
         await second.importLayouts(stored)
         _ = await second.reconcile(world.observe())
         #expect(ids(await second.trees[key2]) == [1, 7])
+    }
+
+    @Test func restartWithoutRememberedLayoutKeepsTheTilingOnScreen() async {
+        let world = World()
+        for n in 1...8 { world.add(UInt64(n), x: CGFloat(n) * 500) }
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        _ = await first.drop(WindowID(3), at: CGPoint(x: 5100, y: 700), displays: bothDisplays,
+                             currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let before = await first.trees[key2]!
+        // TILE32 restarts and has nothing remembered: the screen is read back.
+        let second = LayoutEngine(writer: world)
+        let summary = await second.reconcile(world.observe())
+        #expect(summary.written == 0)
+        #expect(shape(await second.trees[key2]!) == shape(before))
+        #expect(summary.layoutsChanged)
+    }
+
+    @Test func rememberedStructureWinsWhenItMatchesTheScreen() async {
+        let world = World()
+        for n in 1...4 { world.add(UInt64(n), x: CGFloat(n) * 900) }
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        // Two rows whose columns happen to line up; read from the screen alone this would be
+        // two columns of two.
+        await first.setTree(LayoutTree(root: .split(.vertical, [
+            SplitChild(.split(.horizontal, [SplitChild(.leaf(WindowID(1)), weight: 0.5), SplitChild(.leaf(WindowID(2)), weight: 0.5)]), weight: 0.5),
+            SplitChild(.split(.horizontal, [SplitChild(.leaf(WindowID(3)), weight: 0.5), SplitChild(.leaf(WindowID(4)), weight: 0.5)]), weight: 0.5),
+        ])), for: key2)
+        _ = await first.reconcile(world.observe())
+        let stored = await first.exportLayouts(world.observe())
+        let second = LayoutEngine(writer: world)
+        await second.importLayouts(stored)
+        let summary = await second.reconcile(world.observe())
+        #expect(summary.written == 0)
+        #expect(shape(await second.trees[key2]!) == "V(H(1,2),H(3,4))")
+    }
+
+    @Test func afterAComputerRestartWindowsGoBackToTheirPlaces() async {
+        // Before: Safari on the laptop, and on the Dell Mail, Safari and Notes, in a custom order.
+        let world = World()
+        world.add(9, x: -1500, y: 400, width: 600, bundleID: "com.apple.Safari", title: "News")
+        world.add(1, x: 100, bundleID: "com.apple.mail", title: "Inbox")
+        world.add(2, x: 1500, bundleID: "com.apple.Safari", title: "Docs")
+        world.add(3, x: 3000, bundleID: "com.apple.Notes", title: "Notes")
+        let first = LayoutEngine(writer: world)
+        _ = await first.reconcile(world.observe())
+        let notes = world.window(3)!.frame
+        _ = await first.drop(WindowID(1), at: CGPoint(x: notes.midX, y: notes.midY), displays: bothDisplays,
+                             currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(ids(await first.trees[key2]) == [3, 2, 1])
+        let stored = await first.exportLayouts(world.observe())
+
+        // After the restart every window has a new number and opens somewhere else, overlapping.
+        let rebooted = World()
+        rebooted.add(21, x: -1400, y: 350, width: 700, bundleID: "com.apple.Safari", title: "News")
+        rebooted.add(22, x: 200, bundleID: "com.apple.Safari", title: "Docs")
+        rebooted.add(23, x: 400, bundleID: "com.apple.Notes", title: "Notes")
+        rebooted.add(24, x: 600, bundleID: "com.apple.mail", title: "Inbox")
+        let second = LayoutEngine(writer: rebooted)
+        await second.importLayouts(stored)
+        let summary = await second.reconcile(rebooted.observe())
+        #expect(summary.written > 0)
+        #expect(ids(await second.trees[key2]) == [23, 22, 24])
+        #expect(ids(await second.trees[LayoutKey(space: SpaceID(4), display: laptop)]) == [21])
     }
 
     @Test func titlesAreHashedNotStored() {
