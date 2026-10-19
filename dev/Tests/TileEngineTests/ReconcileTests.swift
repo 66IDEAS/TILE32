@@ -33,6 +33,10 @@ private final class World: FrameWriting, @unchecked Sendable {
         var minimised = false
         var fullScreen = false
         var minimumSize: CGSize = .zero
+        /// The next writes take the position but keep the old width, as Safari did right
+        /// after moving to the Retina display (macOS itself had fitted the height to the
+        /// smaller display). `Int.max` ignores widths for ever.
+        var ignoredSizeWrites = 0
     }
 
     private let lock = NSLock()
@@ -86,6 +90,10 @@ private final class World: FrameWriting, @unchecked Sendable {
                 var actual = item.frame
                 actual.size.width = max(actual.width, window.minimumSize.width)
                 actual.size.height = max(actual.height, window.minimumSize.height)
+                if window.ignoredSizeWrites > 0 {
+                    if window.ignoredSizeWrites != .max { window.ignoredSizeWrites -= 1 }
+                    actual.size.width = window.frame.width
+                }
                 window.frame = actual
                 windows[item.id.raw] = window
                 results[item.id] = FrameWriteResult(requested: item.frame, actual: actual, positionError: .success,
@@ -455,6 +463,47 @@ struct DropTests {
         #expect(ids(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)]) == [3])
         // It fills the laptop's usable area minus the gap (US-18.3).
         #expect(world.window(3)!.frame == CGRect(x: -1722, y: 273, width: 1716, height: 1073))
+    }
+
+    @Test func ignoredSizeAfterADropIsWrittenAgainUntilItFits() async {
+        let (world, engine) = await setUp()
+        world.update(3) { $0.ignoredSizeWrites = 2 }
+        let outcome = await engine.drop(WindowID(3), at: CGPoint(x: -633, y: 351), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .movedToEmptyDisplay)
+        #expect(world.window(3)!.frame.width < 1716)
+        #expect(await engine.needsWriteRetry)
+        let first = await engine.reconcile(world.observe())
+        #expect(first.written == 1 && first.failed == 1)
+        let second = await engine.reconcile(world.observe())
+        #expect(second.written == 1 && second.matched == 1)
+        #expect(world.window(3)!.frame == CGRect(x: -1722, y: 273, width: 1716, height: 1073))
+        #expect(await !engine.needsWriteRetry)
+        #expect(await engine.reconcile(world.observe()).written == 0)
+    }
+
+    @Test func appThatKeepsIgnoringIsLeftAloneAfterThreeAttempts() async {
+        let (world, engine) = await setUp()
+        world.update(3) { $0.ignoredSizeWrites = .max }
+        _ = await engine.drop(WindowID(3), at: CGPoint(x: -633, y: 351), displays: bothDisplays,
+                              currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        let writesAfterDrop = world.writes
+        for _ in 0..<LayoutEngine.maximumWriteRetries {
+            #expect(await engine.needsWriteRetry)
+            #expect(await engine.reconcile(world.observe()).written == 1)
+        }
+        #expect(await !engine.needsWriteRetry)
+        #expect(await engine.reconcile(world.observe()).written == 0)
+        #expect(world.writes == writesAfterDrop + LayoutEngine.maximumWriteRetries)
+    }
+
+    @Test func userMovingAWindowAwayIsStillPutBackOnlyOnce() async {
+        let (world, engine) = await setUp()
+        world.update(2) { $0.frame = $0.frame.offsetBy(dx: 0, dy: 200) }
+        #expect(await engine.reconcile(world.observe()).written == 1)
+        world.update(2) { $0.frame = $0.frame.offsetBy(dx: 0, dy: 200) }
+        #expect(await engine.reconcile(world.observe()).written == 0)
+        #expect(await !engine.needsWriteRetry)
     }
 
     @Test func swapAcrossDisplaysExchangesBothWindows() async {

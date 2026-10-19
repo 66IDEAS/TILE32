@@ -128,6 +128,7 @@ extension LayoutEngine {
                 tree = tree.removing(id)
                 lastTile[id] = nil
                 retries[id] = nil
+                ignoredWrites.remove(id)
                 summary.departed += 1
             }
 
@@ -202,7 +203,8 @@ extension LayoutEngine {
     }
 
     /// The frames to write for the shown layouts (TA-12): a window is written when its tile
-    /// changed, or when it moved away from its tile (put back at most `maximumRetries` times).
+    /// changed, or when it moved away from its tile (put back at most `maximumRetries` times,
+    /// or `maximumWriteRetries` times when the app ignored the last write).
     /// Windows in `force` are always written, for example a window the user just dropped.
     func frameBatch(displays: DisplayTable, currentSpaces: [DisplayID: SpaceInfo],
                     snapshots: [WindowID: WindowSnapshot], force: Set<WindowID> = []) -> [FrameAssignment] {
@@ -231,7 +233,8 @@ extension LayoutEngine {
                 guard !doesNotFit.contains(id), let current = snapshot.frame,
                       !Self.close(current, frame, tolerance: FrameWriteResult.stepTolerance) else { continue }
                 let attempts = retries[id] ?? 0
-                guard attempts < Self.maximumRetries else { continue }
+                let limit = ignoredWrites.contains(id) ? Self.maximumWriteRetries : Self.maximumRetries
+                guard attempts < limit else { continue }
                 retries[id] = attempts + 1
                 batch.append(FrameAssignment(id: id, window: snapshot, frame: frame))
             }

@@ -24,6 +24,9 @@ public final class TilingCoordinator {
     /// still report the old state. After a run that minimised, restored or took in a window,
     /// the next reading waits this long (found in the M1 window limit check: flapping).
     static let settleTime: Duration = .milliseconds(800)
+    /// Wait before writing again to a window whose app ignored a write (for example Safari
+    /// right after moving to a display with another scale).
+    static let writeRetryDelay: Duration = .seconds(1)
 
     public private(set) var state: RunState
     public private(set) var lastSummary = ReconcileSummary()
@@ -50,6 +53,7 @@ public final class TilingCoordinator {
     private var lastAnimation: ContinuousClock.Instant = .now - .seconds(10)
     /// The last reading, so a drop can write without reading every window again.
     private var lastObservation: Observation?
+    private var writeRetryPending = false
 
     /// `onlyBundleIDs` limits tiling to some apps; used by test runs on FakeWindows.
     public init(engine: LayoutEngine, spaceService: SpaceService, initialState: RunState,
@@ -191,6 +195,19 @@ public final class TilingCoordinator {
             lastSummary = summary
             onChange()
         } while runAgain && state == .running
+        await scheduleWriteRetry()
+    }
+
+    /// Looks again after `writeRetryDelay` when an app ignored a write. Bounded by
+    /// `LayoutEngine.maximumWriteRetries`, so it never loops.
+    private func scheduleWriteRetry() async {
+        guard !writeRetryPending, await engine.needsWriteRetry else { return }
+        writeRetryPending = true
+        Task { @MainActor in
+            try? await Task.sleep(for: Self.writeRetryDelay)
+            writeRetryPending = false
+            trigger("retry ignored write")
+        }
     }
 
     /// Remembered layouts (US-26): saved after changes, offered once after a restart.
@@ -263,6 +280,7 @@ public final class TilingCoordinator {
         lastWrite = .now
         await saveLayouts(observation)
         onChange()
+        await scheduleWriteRetry()
     }
 
     /// An edge resize moved or ended (US-28, TA-25). Returns the window's share for the label.
@@ -281,6 +299,7 @@ public final class TilingCoordinator {
         if final {
             await saveLayouts(observation)
             onChange()
+            await scheduleWriteRetry()
         }
         return share
     }
@@ -311,6 +330,7 @@ public final class TilingCoordinator {
         lastWrite = .now
         lastSummary = summary
         onChange()
+        await scheduleWriteRetry()
         return summary
     }
 

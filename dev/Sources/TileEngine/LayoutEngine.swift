@@ -80,12 +80,22 @@ public actor LayoutEngine {
     /// How often TILE32 puts back a window that moved away from its tile, before leaving it
     /// alone until its tile changes (TA-12: never fight an app).
     public static let maximumRetries = 1
+    /// How often TILE32 writes again when an app ignored a write: the window is neither in
+    /// its tile nor too large for it. Found when a Safari window was dropped on the Retina
+    /// display: Safari took the position but kept its old size for more than 0.4 seconds.
+    public static let maximumWriteRetries = 3
 
     public internal(set) var trees: [LayoutKey: LayoutTree] = [:]
     public internal(set) var doesNotFit: Set<WindowID> = []
     /// Windows TILE32 minimised to respect a window limit (rule L9). Windows the user
     /// minimised are never in here, so TILE32 never brings those back (US-31.8).
     public internal(set) var minimisedByEngine: Set<WindowID> = []
+
+    /// True when a window's last write was ignored and it has attempts left, so the
+    /// coordinator should look again shortly.
+    public var needsWriteRetry: Bool {
+        ignoredWrites.contains { (retries[$0] ?? 0) < Self.maximumWriteRetries }
+    }
 
     /// True when "Untile" has something to restore (US-24.6).
     public var canUntile: Bool { !originals.isEmpty }
@@ -102,6 +112,8 @@ public actor LayoutEngine {
     var lastTile: [WindowID: CGRect] = [:]
     /// Put-backs per window for its current tile (TA-12).
     var retries: [WindowID: Int] = [:]
+    /// Windows whose last write the app ignored; they get `maximumWriteRetries` attempts.
+    var ignoredWrites: Set<WindowID> = []
     /// Where a window that left a layout (minimised, hidden, full screen) comes back (TA-9).
     var returnHints: [WindowID: (hint: ReturnHint, key: LayoutKey)] = [:]
     /// The layout a window minimised by TILE32 belongs to, and the order of minimising
@@ -177,9 +189,24 @@ public actor LayoutEngine {
             if result.doesNotFit {
                 notFitting += 1
                 doesNotFit.insert(id)
+                ignoredWrites.remove(id)
             } else {
                 doesNotFit.remove(id)
-                if result.fits { matched += 1 } else { failed += 1 }
+                if result.fits {
+                    matched += 1
+                    ignoredWrites.remove(id)
+                } else {
+                    failed += 1
+                    ignoredWrites.insert(id)
+                    // App name and frames only, never the title (N-4).
+                    Log.layout.info("""
+                        Write ignored by \(item.window.app.name, privacy: .public) \(id.description, privacy: .public): \
+                        requested \(String(describing: result.requested), privacy: .public), \
+                        got \(result.actual.map { String(describing: $0) } ?? "nothing", privacy: .public), \
+                        size error \(result.sizeError.rawValue, privacy: .public), \
+                        position error \(result.positionError.rawValue, privacy: .public)
+                        """)
+                }
             }
         }
         Log.layout.info("Wrote \(batch.count) frames: \(matched) fit, \(notFitting) do not fit, \(failed) failed")
@@ -248,6 +275,7 @@ public actor LayoutEngine {
         minimisedSnapshots.removeAll()
         lastTile.removeAll()
         retries.removeAll()
+        ignoredWrites.removeAll()
         returnHints.removeAll()
         let summary = UntileSummary(restored: batch.count - failed, unminimised: toRestore.count - failedRestore.count,
                                     failed: failed + failedRestore.count)
