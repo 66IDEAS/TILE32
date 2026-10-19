@@ -142,18 +142,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #endif
             tracker.onDragMove = { [weak self] number, point in self?.dragMoved(number, point) }
             tracker.onDragEnd = { [weak self] number, point, cancelled in self?.dragEnded(number, point, cancelled) }
-            tracker.onCancel = { [weak self] in self?.overlay.hide() }
+            tracker.onCancel = { [weak self] in self?.cancelGesture() }
             tracker.onResize = { [weak self] number, frame, edges, final in self?.resized(number, frame, edges, final) }
             dragTracker = tracker
         }
         dragTracker?.start()
     }
 
+    /// Bumped whenever a drag or resize ends. A preview or share label that arrives after
+    /// that belongs to the finished gesture and is dropped (found on 2026-10-19: the
+    /// "Place on the right" highlight stayed on screen after a drop, because the last preview
+    /// came back from the engine after the drop had hidden the overlay).
+    private var gestureGeneration = 0
+
+    private func endGesture() {
+        gestureGeneration += 1
+        overlay.hide()
+    }
+
+    private func cancelGesture() {
+        endGesture()
+        coordinator?.gestureCancelled()
+    }
+
     private func dragMoved(_ number: CGWindowID, _ point: CGPoint) {
         guard let coordinator else { return }
+        let generation = gestureGeneration
         Task {
             let table = displayTable
-            if let preview = await coordinator.dragMoved(number, at: point),
+            let preview = await coordinator.dragMoved(number, at: point)
+            guard generation == gestureGeneration else { return }
+            if let preview,
                let display = table.display(id: preview.key.display) {
                 overlay.show(area: preview.area, label: OverlayController.label(for: preview.target), on: display, table: table)
             } else {
@@ -166,10 +185,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func resized(_ number: CGWindowID, _ frame: CGRect, _ edges: Set<DragStateMachine.Edge>, _ final: Bool) {
         guard let coordinator else { return }
         let coreEdges = Set(edges.compactMap { Edge(rawValue: $0.rawValue) })
+        let generation = gestureGeneration
+        if final { endGesture() }
         Task {
             let share = await coordinator.resized(number, to: frame, edges: coreEdges, final: final)
+            guard !final, generation == gestureGeneration else { return }
             let table = displayTable
-            if !final, let share, let display = table.display(mostlyContaining: frame) {
+            if let share, let display = table.display(mostlyContaining: frame) {
                 let percent = Int((share * 100).rounded())
                 overlay.showLabel("\(percent)%", centredIn: frame, on: display, table: table)
             } else {
@@ -179,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func dragEnded(_ number: CGWindowID, _ point: CGPoint, _ cancelled: Bool) {
-        overlay.hide()
+        endGesture()
         guard let coordinator else { return }
         Task { await coordinator.dragEnded(number, at: point, cancelled: cancelled) }
     }

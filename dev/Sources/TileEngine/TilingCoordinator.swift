@@ -59,6 +59,12 @@ public final class TilingCoordinator {
     private var lastObservation: Observation?
     private var writeRetryPending = false
     private var midSwitchHolds = 0
+    /// The last drag or resize step. Between the mouse-up and the drop taking the lock, a
+    /// layout run must not start, or it puts the dragged window back first (found on
+    /// 2026-10-19). Cleared when the gesture ends; ignored after `gestureTimeout` in case an
+    /// end is never reported.
+    private var lastGestureStep: ContinuousClock.Instant = .now - .seconds(10)
+    static let gestureTimeout: Duration = .seconds(2)
 
     /// `onlyBundleIDs` limits tiling to some apps; used by test runs on FakeWindows.
     public init(engine: LayoutEngine, spaceService: SpaceService, initialState: RunState,
@@ -171,8 +177,9 @@ public final class TilingCoordinator {
                 scheduleCheck()
                 return
             }
-            // Never while the user holds the mouse button: a drag or resize is in progress.
-            if NSEvent.pressedMouseButtons & 1 != 0 {
+            // Never while the user holds the mouse button or a drag or resize is still being
+            // finished: a drag or resize is in progress.
+            if NSEvent.pressedMouseButtons & 1 != 0 || now - lastGestureStep < Self.gestureTimeout {
                 scheduleCheck()
                 return
             }
@@ -271,6 +278,7 @@ public final class TilingCoordinator {
     /// What a release at `point` would do, for the overlay (US-16). Nil while paused.
     public func dragMoved(_ number: CGWindowID, at point: CGPoint) async -> DropPreview? {
         guard state == .running else { return nil }
+        lastGestureStep = .now
         let table = displays()
         return await engine.dropPreview(for: WindowID(UInt64(number)), at: point, displays: table,
                                         currentSpaces: spaceService.currentSpaces(on: table))
@@ -279,6 +287,7 @@ public final class TilingCoordinator {
     /// Applies a drop, or puts the window back after Escape (US-14 to US-19). Runs under the
     /// same lock as reconcile, so the two never interleave.
     public func dragEnded(_ number: CGWindowID, at point: CGPoint, cancelled: Bool) async {
+        defer { lastGestureStep = .now - .seconds(10) }
         guard state == .running else { return }
         while running { try? await Task.sleep(for: .milliseconds(20)) }
         running = true
@@ -304,8 +313,14 @@ public final class TilingCoordinator {
         await scheduleWriteRetry()
     }
 
+    /// A drag or resize ended without a release, for example by a desktop switch.
+    public func gestureCancelled() {
+        lastGestureStep = .now - .seconds(10)
+    }
+
     /// An edge resize moved or ended (US-28, TA-25). Returns the window's share for the label.
     public func resized(_ number: CGWindowID, to frame: CGRect, edges: Set<Edge>, final: Bool) async -> Double? {
+        lastGestureStep = final ? .now - .seconds(10) : .now
         guard state == .running, let observation = lastObservation else { return nil }
         if final {
             while running { try? await Task.sleep(for: .milliseconds(20)) }
