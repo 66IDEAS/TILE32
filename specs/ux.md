@@ -59,15 +59,19 @@ Details:
 | Untile                                        |
 +-----------------------------------------------+
 | [ ] Start at login                            |
++-----------------------------------------------+
+| About TILE32                                  |
+| TILE32 Help                                   |
++-----------------------------------------------+
 | Quit TILE32                                   |
 +-----------------------------------------------+
 ```
 
 - The status line is the first item. It is grey and has no action (see UX-9 for its texts).
-- The groups are: arranging (Tile now, Make sizes equal, Windows), per-app control, stopping (Pause, Untile), and app settings (Start at login, Quit). The order goes from the most common to the least common.
+- The groups are: arranging (Tile now, Make sizes equal, Windows), per-app control, stopping (Pause, Untile), app settings (Start at login), information (About, Help, see UX-18), and Quit. The order goes from the most common to the least common.
 - Menu items use standard system styling, so they follow the system font, size and appearance. TILE32 draws no custom menu content.
 - A checkbox item shows a check mark when on: "Start at login". If macOS asks the user to approve the login item in System Settings, the text becomes "Start at login (approve in System Settings)", and choosing it opens that screen.
-- In debug builds only, a "Debug" submenu appears above "Quit TILE32" with "Dump layout trees" and "Copy diagnostics".
+- In debug builds only, a "Debug" submenu appears below "Start at login" with "Dump layout trees" and "Copy diagnostics".
 
 **Serves:** US-1, US-3, US-4, US-22, US-23, US-24, US-25
 
@@ -91,6 +95,10 @@ Details:
 | Untile                                        |
 +-----------------------------------------------+
 | [ ] Start at login                            |
++-----------------------------------------------+
+| About TILE32                                  |
+| TILE32 Help                                   |
++-----------------------------------------------+
 | Quit TILE32                                   |
 +-----------------------------------------------+
 ```
@@ -125,6 +133,10 @@ Details:
 | Untile                            (grey)      |
 +-----------------------------------------------+
 | [ ] Start at login                            |
++-----------------------------------------------+
+| About TILE32                                  |
+| TILE32 Help                                   |
++-----------------------------------------------+
 | Quit TILE32                                   |
 +-----------------------------------------------+
 ```
@@ -331,6 +343,9 @@ A status line text stays until the state changes. It is not timed, so there is n
 | Untile | Menu item |
 | Start at login | Menu item (checkbox) |
 | Start at login (approve in System Settings) | Menu item, when macOS needs approval |
+| About TILE32 | Menu item (UX-18) |
+| TILE32 Help | Menu item (UX-18) |
+| Your windows side by side, arranged with the mouse. | About panel, below the 66ideas logo |
 | Quit TILE32 | Menu item |
 | Dump layout trees, Log Spaces, Log windows, Frame write test (moves windows), Copy diagnostics | Debug builds only |
 | (does not fit) | Suffix in the "Windows" submenu |
@@ -400,6 +415,16 @@ A status line text stays until the state changes. It is not timed, so there is n
 - Nothing else is shown when a window is swapped: the usual macOS minimise and restore animations are the only feedback.
 
 **Serves:** US-31, US-3.5
+
+### UX-18 About and Help
+
+**Description:** Two items above "Quit TILE32" give information about the app.
+
+- "About TILE32" opens the standard macOS About panel, brought to the front: the app icon, the name, the version and build number from the bundle, the copyright line, and in the credits the 66ideas logo (light or dark variant for the current appearance) with the line "Your windows side by side, arranged with the mouse."
+- "TILE32 Help" opens the TILE32 website in the default browser once it exists (`AppLinks.website`). Until then it opens a short help page bundled with the app, in the default browser, in light or dark mode following the system.
+- The app icon (the blue "32" on a dark square) and the 66ideas logo come from the 66ideas brand kit. `dev/sync-brand.sh` copies them into `dev/Resources/Brand/` under stable names. The icon also appears in Finder, System Settings (Accessibility, Login Items) and notarization dialogs.
+
+**Serves:** US-1
 
 ---
 

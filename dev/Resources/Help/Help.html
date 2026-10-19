@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TILE32 Help</title>
+<style>
+  :root {
+    --bg: #F8F6F1; --text: #16181D; --muted: #5D6068; --accent: #2E62E8; --rule: #E2DED4; --key: #EDEAE2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181D; --text: #F2EFE7; --muted: #A4A7AE; --accent: #7A99F5; --rule: #2C2F36; --key: #24272E; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: 0.02em; }
+  h1 span { color: var(--accent); font-weight: 400; }
+  .lead { color: var(--muted); margin: 0 0 32px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  p, li { margin: 0 0 8px; }
+  ul { padding-left: 20px; }
+  kbd { background: var(--key); border-radius: 4px; padding: 1px 6px; font: inherit; font-size: 13px; }
+  .zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-width: 300px; margin: 12px 0; }
+  .zones div { background: var(--key); border-radius: 6px; padding: 10px 4px; text-align: center; font-size: 12px; color: var(--muted); }
+  .zones .c { background: var(--accent); color: var(--bg); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TILE<span>32</span></h1>
+  <p class="lead">Your windows side by side, arranged with the mouse.</p>
+
+  <h2>Getting started</h2>
+  <ul>
+    <li>TILE32 lives in the menu bar. It needs the Accessibility permission to move windows. If it is missing, choose "Open Accessibility settings..." in the menu and switch TILE32 on.</li>
+    <li>TILE32 starts paused. Choose "Resume tiling" to start, or "Tile now" to arrange the current windows once.</li>
+    <li>Every display and every Space has its own layout, and TILE32 remembers each one.</li>
+  </ul>
+
+  <h2>Moving windows</h2>
+  <p>Drag a window by its title bar and drop it on another window. While you drag, a highlight shows what will happen.</p>
+  <div class="zones" aria-hidden="true">
+    <div></div><div>Top: split</div><div></div>
+    <div>Left: split</div><div class="c">Centre: swap</div><div>Right: split</div>
+    <div></div><div>Bottom: split</div><div></div>
+  </div>
+  <ul>
+    <li>Drop on the centre of a window to swap the two windows.</li>
+    <li>Drop near an edge to split that window and place yours on that side.</li>
+    <li>Drop on another display to move the window there.</li>
+    <li>Press <kbd>Esc</kbd> while dragging, and the window goes back to its tile.</li>
+  </ul>
+
+  <h2>Changing sizes</h2>
+  <ul>
+    <li>Drag the edge between two windows. The neighbour follows, and sizes snap to quarters, thirds and halves.</li>
+    <li>"Make sizes equal" in the menu gives the windows you can see the same share again.</li>
+  </ul>
+
+  <h2>New, closed and extra windows</h2>
+  <ul>
+    <li>New windows join the layout, and closed windows leave a gap that the others fill.</li>
+    <li>When columns would get too narrow, TILE32 uses a second row.</li>
+    <li>"Window limit" sets how many windows share a display. Extra windows are minimised and come back when you use them.</li>
+    <li>Dialogs, panels, full-screen windows and windows that cannot be resized stay floating.</li>
+    <li>A window that cannot get as small as its tile is marked "does not fit", and the number shows next to the menu bar icon.</li>
+  </ul>
+
+  <h2>Taking a break</h2>
+  <ul>
+    <li>"Pause tiling" stops all arranging. Windows stay where they are.</li>
+    <li>"Untile" puts every window back where it was before TILE32 moved it, then pauses.</li>
+    <li>"Don't tile" with an app's name leaves that app alone. "Excluded apps" lists them.</li>
+  </ul>
+
+  <footer>TILE32 by 66ideas</footer>
+</main>
+</body>
+</html>

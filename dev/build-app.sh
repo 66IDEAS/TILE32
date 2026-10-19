@@ -13,7 +13,8 @@ cd "$(dirname "$0")"
 
 PRODUCT="${1:-TILE32}"
 MODE="${2:-dev}"
-DEV_IDENTITY="Apple Development: Alexander Ilg"
+# Contributors set TILE32_DEV_IDENTITY to their own signing identity.
+DEV_IDENTITY="${TILE32_DEV_IDENTITY:-Apple Development: Alexander Ilg}"
 
 case "$PRODUCT" in
     TILE32)      PLIST="Resources/Info.plist" ;;
@@ -44,6 +45,10 @@ cp "$PLIST" "$APP/Contents/Info.plist"
 # Every build gets its own build number, so two builds are never identical.
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(date +%Y%m%d%H%M%S)" "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
+if [ "$PRODUCT" = "TILE32" ]; then
+    # App icon, 66ideas logo (from sync-brand.sh) and the help page.
+    cp Resources/Brand/* Resources/Help/* "$APP/Contents/Resources/"
+fi
 
 if [ "$MODE" = "release" ]; then
     # A secure timestamp is required for notarization.

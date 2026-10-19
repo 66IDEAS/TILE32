@@ -100,6 +100,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         #if DEBUG
         menu.addItem(debugItem())
         #endif
+        menu.addItem(.separator())
+        menu.addItem(ActionMenuItem(title: "About TILE32") { AboutPanel.show() })
+        menu.addItem(ActionMenuItem(title: "TILE32 Help") { HelpPage.open() })
+        menu.addItem(.separator())
         menu.addItem(ActionMenuItem(title: "Quit TILE32") {
             Log.ui.info("Quit chosen from the menu")
             NSApp.terminate(nil)

@@ -8,6 +8,8 @@
 	<string>TILE32</string>
 	<key>CFBundleDisplayName</key>
 	<string>TILE32</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>TILE32</string>
 	<key>CFBundlePackageType</key>

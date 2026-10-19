@@ -466,6 +466,13 @@ Goal: safe and pleasant for every day use, and ready to be given to others.
 - **Errors found:** several windows of one app with the same title were matched to the wrong places. Fixed: match by title and position first, by title only when it is unique, then by position. Resolved 2026-10-18.
 - **Open:** the owner decides whether to keep US-26 (OQ-7) after trying a restart with real windows.
 
+### [~] T-3.11 Brand, About and Help
+- **Do:** Embed the app icon and the 66ideas logo from the brand kit (`dev/sync-brand.sh`, `CFBundleIconFile`), add "About TILE32" and "TILE32 Help" to the menu (UX-18), and a bundled help page until the website exists. Add the repository root files like the MD22 repository: README, LICENSE (MIT), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, THIRD_PARTY_NOTICES.
+- **Traces:** UX-18, UX-15, US-1
+- **Done when:** the app shows its icon in Finder and the About panel, the About panel shows the logo in light and dark mode, and Help opens the help page.
+- **Progress:** done on 2026-10-19. The first brand kit named the app "TILES32"; the owner regenerates it as TILE32, and `sync-brand.sh` then copies the new files (it falls back to the old folder name). The kit's TILES32 wordmark is not used. `THIRD_PARTY_NOTICES.md` moved from `dev/` to the root. `build-app.sh` takes `TILE32_DEV_IDENTITY` for contributors. Waiting for the owner to look at the About panel and the help page.
+- **Depends on:** -
+
 ### [ ] T-3.10 [owner] M3 acceptance and release check
 - **Do:** Go through the M3 checklist, then the full checklist of all milestones once more on the notarized build.
 - **Traces:** US-21 to US-27, N-1 to N-12
