@@ -27,6 +27,10 @@ public final class TilingCoordinator {
     /// Wait before writing again to a window whose app ignored a write (for example Safari
     /// right after moving to a display with another scale).
     static let writeRetryDelay: Duration = .seconds(1)
+    /// A reading taken during a desktop switch is read again after this wait, at most
+    /// `maximumMidSwitchHolds` times in a row; after that it is taken as it is.
+    static let midSwitchRetryDelay: Duration = .milliseconds(250)
+    static let maximumMidSwitchHolds = 8
 
     public private(set) var state: RunState
     public private(set) var lastSummary = ReconcileSummary()
@@ -54,6 +58,7 @@ public final class TilingCoordinator {
     /// The last reading, so a drop can write without reading every window again.
     private var lastObservation: Observation?
     private var writeRetryPending = false
+    private var midSwitchHolds = 0
 
     /// `onlyBundleIDs` limits tiling to some apps; used by test runs on FakeWindows.
     public init(engine: LayoutEngine, spaceService: SpaceService, initialState: RunState,
@@ -116,6 +121,8 @@ public final class TilingCoordinator {
     }
 
     private func handleWorkspace(_ name: NSNotification.Name, pid: pid_t?) {
+        // The switch animation takes about half a second; read after it (found 2026-10-19).
+        if name == NSWorkspace.activeSpaceDidChangeNotification { lastAnimation = .now }
         if name == NSWorkspace.didLaunchApplicationNotification, let pid { events?.watch(pid) }
         if name == NSWorkspace.didTerminateApplicationNotification, let pid {
             events?.unwatch(pid)
@@ -185,8 +192,18 @@ public final class TilingCoordinator {
         repeat {
             runAgain = false
             let observation = await observe()
+            let summary = await engine.reconcile(observation, limits: limits(), excludedBundleIDs: excludedBundleIDs(),
+                                                 acceptMidSwitch: midSwitchHolds >= Self.maximumMidSwitchHolds)
+            if summary.heldMidSwitch {
+                midSwitchHolds += 1
+                Task { @MainActor in
+                    try? await Task.sleep(for: Self.midSwitchRetryDelay)
+                    trigger("read again after a desktop switch")
+                }
+                break
+            }
+            midSwitchHolds = 0
             lastObservation = observation
-            let summary = await engine.reconcile(observation, limits: limits(), excludedBundleIDs: excludedBundleIDs())
             if summary.changedAnything {
                 lastWrite = .now
                 await saveLayouts(observation)
@@ -234,9 +251,13 @@ public final class TilingCoordinator {
         let unanswered = Set(scan.apps.filter { $0.error == .cannotComplete }.map(\.app.pid))
         let hidden = Set(NSWorkspace.shared.runningApplications.filter(\.isHidden).map(\.processIdentifier))
         let recency = WindowServerList.frontToBack().map { WindowID(UInt64($0)) }
+        let pids = Set(apps.map(\.pid))
+        let serverNumbers = WindowServerList.normalWindows().filter { pids.contains($0.ownerPID) }.map(\.number)
+        var known: [WindowID: [SpaceID]] = [:]
+        for (number, spaces) in spaceService.spaces(of: serverNumbers) { known[WindowID(UInt64(number))] = spaces }
         return Observation(records: Array(scan.registry.records.values), displays: table,
                            currentSpaces: spaceService.currentSpaces(on: table), recency: recency,
-                           unansweredPIDs: unanswered, hiddenPIDs: hidden)
+                           unansweredPIDs: unanswered, hiddenPIDs: hidden, knownSpaces: known)
     }
 
     private func apps() -> [AppInfo] {

@@ -22,15 +22,20 @@ public struct Observation: Sendable {
     public var unansweredPIDs: Set<pid_t>
     /// Hidden apps (Cmd-H). Their windows leave the layout and come back later (US-8).
     public var hiddenPIDs: Set<pid_t>
+    /// The Spaces of every window the window server knows, also those Accessibility did not
+    /// list. Empty in fallback mode and in most tests; then the mid-switch check is skipped.
+    public var knownSpaces: [WindowID: [SpaceID]]
 
     public init(records: [WindowRecord], displays: DisplayTable, currentSpaces: [DisplayID: SpaceInfo],
-                recency: [WindowID] = [], unansweredPIDs: Set<pid_t> = [], hiddenPIDs: Set<pid_t> = []) {
+                recency: [WindowID] = [], unansweredPIDs: Set<pid_t> = [], hiddenPIDs: Set<pid_t> = [],
+                knownSpaces: [WindowID: [SpaceID]] = [:]) {
         self.records = records
         self.displays = displays
         self.currentSpaces = currentSpaces
         self.recency = recency
         self.unansweredPIDs = unansweredPIDs
         self.hiddenPIDs = hiddenPIDs
+        self.knownSpaces = knownSpaces
     }
 }
 
@@ -44,6 +49,8 @@ public struct ReconcileSummary: Sendable, Equatable {
     public var failed = 0
     public var minimised = 0
     public var restored = 0
+    /// The reading mixed two desktops and nothing was changed; read again shortly.
+    public var heldMidSwitch = false
 
     public var changedAnything: Bool { written > 0 || minimised > 0 || restored > 0 }
 }
@@ -55,9 +62,15 @@ extension LayoutEngine {
         _ observation: Observation,
         limits: WindowLimits = WindowLimits(),
         excludedBundleIDs: Set<String> = [],
-        rebuild: Bool = false
+        rebuild: Bool = false,
+        acceptMidSwitch: Bool = false
     ) async -> ReconcileSummary {
         var summary = ReconcileSummary()
+        if !acceptMidSwitch, let reason = midSwitchReason(observation) {
+            Log.layout.info("Reading mixes two desktops (\(reason, privacy: .public)), waiting")
+            summary.heldMidSwitch = true
+            return summary
+        }
         let rank = Dictionary(observation.recency.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         func lastUsed(_ id: WindowID) -> Int { rank[id] ?? .max }
 
@@ -200,6 +213,41 @@ extension LayoutEngine {
                 """)
         }
         return summary
+    }
+
+    /// Why the reading belongs to a desktop switch in progress, or nil when it is consistent.
+    /// macOS reports the new Space at once, but Accessibility lists the old desktop's windows
+    /// for a moment and the new desktop's windows only afterwards. Taken as it is, such a
+    /// reading removes the shown windows and adds them again in another order (found by the
+    /// owner on 2026-10-19: the windows of desktop 2 swapped places after a switch).
+    func midSwitchReason(_ observation: Observation) -> String? {
+        guard !observation.currentSpaces.isEmpty else { return nil }
+        // A listed window that the window server places on a desktop no display shows.
+        let shown = Set(observation.currentSpaces.values.map(\.id))
+        for record in observation.records {
+            guard !record.spaces.isEmpty,
+                  !observation.hiddenPIDs.contains(record.snapshot.app.pid),
+                  WindowClassifier.classify(record.snapshot) == .tiled else { continue }
+            if shown.isDisjoint(with: record.spaces) {
+                return "\(record.id.description) listed but on \(record.spaces.map(\.description).joined(separator: ","))"
+            }
+        }
+        // A tiled window of the shown desktop that is still there but not listed yet.
+        guard !observation.knownSpaces.isEmpty else { return nil }
+        let listed = Set(observation.records.map(\.id))
+        for display in observation.displays.displays {
+            guard let current = observation.currentSpaces[display.id],
+                  let tree = trees[LayoutKey(space: current.id, display: display.id)] else { continue }
+            for id in tree.windowIDs where !listed.contains(id) {
+                if let pid = windowPIDs[id], observation.unansweredPIDs.contains(pid) || observation.hiddenPIDs.contains(pid) {
+                    continue
+                }
+                if observation.knownSpaces[id]?.contains(current.id) == true {
+                    return "\(id.description) on \(current.id.description) but not listed"
+                }
+            }
+        }
+        return nil
     }
 
     /// The frames to write for the shown layouts (TA-12): a window is written when its tile

@@ -398,6 +398,81 @@ private func current(_ space: SpaceInfo, _ displays: DisplayTable = bothDisplays
     Dictionary(displays.displays.map { ($0.id, space) }, uniquingKeysWith: { first, _ in first })
 }
 
+@Suite("Desktop switch in progress")
+struct MidSwitchTests {
+    /// Desktop 2 with three windows (1, 2, 3 from left to right after a swap) and desktop 3
+    /// with two windows.
+    private func setUp() async -> (World, LayoutEngine) {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(3, x: 3000)
+        world.add(7, x: 100, space: SpaceID(5)); world.add(8, x: 2000, space: SpaceID(5))
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe(space: desktop3))
+        _ = await engine.reconcile(world.observe(space: desktop2))
+        // A custom order the user made: 3, 1, 2.
+        _ = await engine.drop(WindowID(3), at: CGPoint(x: world.window(1)!.frame.midX, y: world.window(1)!.frame.midY),
+                              displays: bothDisplays, currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        return (world, engine)
+    }
+
+    private func known(_ world: World) -> [WindowID: [SpaceID]] {
+        Dictionary(uniqueKeysWithValues: [1, 2, 3, 7, 8].compactMap { n in world.window(n).map { (WindowID(n), [$0.space]) } })
+    }
+
+    @Test func oldDesktopWindowsListedForTheNewDesktopAreHeld() async {
+        let (world, engine) = await setUp()
+        let before = await engine.trees[key2]
+        let writes = world.writes
+        // macOS already reports desktop 2, Accessibility still lists desktop 3's windows.
+        var reading = world.observe(space: desktop3)
+        reading.currentSpaces = current(desktop2)
+        reading.knownSpaces = known(world)
+        let summary = await engine.reconcile(reading)
+        #expect(summary.heldMidSwitch)
+        #expect(await engine.trees[key2] == before)
+        #expect(world.writes == writes)
+    }
+
+    @Test func shownWindowsNotListedYetAreHeld() async {
+        let (world, engine) = await setUp()
+        let before = await engine.trees[key2]
+        var reading = world.observe(space: desktop2)
+        reading.records = []   // desktop 2's windows are not listed yet
+        reading.knownSpaces = known(world)
+        let summary = await engine.reconcile(reading)
+        #expect(summary.heldMidSwitch)
+        #expect(await engine.trees[key2] == before)
+        // The settled reading keeps the user's order and writes nothing.
+        var settled = world.observe(space: desktop2)
+        settled.knownSpaces = known(world)
+        let after = await engine.reconcile(settled)
+        #expect(!after.heldMidSwitch && after.written == 0)
+        #expect(ids(await engine.trees[key2]) == ids(before))
+    }
+
+    @Test func windowsClosedOrMovedAwayStillLeave() async {
+        let (world, engine) = await setUp()
+        world.remove(1)                               // closed: the window server no longer has it
+        world.update(2) { $0.space = SpaceID(5) }     // moved to desktop 3 in Mission Control
+        var reading = world.observe(space: desktop2)
+        reading.knownSpaces = known(world)
+        let summary = await engine.reconcile(reading)
+        #expect(!summary.heldMidSwitch)
+        #expect(summary.departed == 2)
+        #expect(ids(await engine.trees[key2]) == [3])
+    }
+
+    @Test func aReadingThatNeverSettlesIsTakenWhenAccepted() async {
+        let (world, engine) = await setUp()
+        var reading = world.observe(space: desktop2)
+        reading.records = []
+        reading.knownSpaces = known(world)
+        let summary = await engine.reconcile(reading, acceptMidSwitch: true)
+        #expect(!summary.heldMidSwitch)
+        #expect(summary.departed == 3)
+    }
+}
+
 @Suite("Drops (M2, US-14 to US-18)")
 struct DropTests {
     /// Three windows side by side on the Dell, tiled.
