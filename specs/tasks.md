@@ -236,6 +236,7 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Depends on:** T-1.2
 - **Progress:** engine logic done in the reconcile step (`Reconcile.swift`, 17 tests with a simulated world): arrivals join by L3, departures re-flow by L4, a second identical reading writes nothing. Waiting for the observers (T-1.2) to run it automatically.
 - **Result:** live check on 2026-10-18 with FakeWindows (`--auto-fakewindows`): a 4th window joined, a closed one re-flowed. Done.
+- **Errors found:** in the owner's use on 2026-10-19, Cmd-T in Finder on desktop 3 rearranged the layout. Tabs are separate windows and only the front tab is listed: the new tab arrived as a new window and joined at the end, the old tab departed, and all 5 windows moved. The new desktop-switch check also took the hidden old tab for a window not listed yet and waited about 8 seconds. Fixed: a vanished window whose tile is taken by a listed window of the same app in the same frame (within 16 points) is replaced in place, and that hidden tab no longer counts as a sign of a desktop switch. This covers new, closed and chosen tabs. 2 tests. Resolved 2026-10-19, waiting for the owner to try tabs in Finder and Safari.
 
 ### [x] T-1.4 Minimise and hide with return hint
 - **Do:** Before removing a minimised window or a hidden app's windows, store the return hint (nearest sibling and side). On return, use `splitting` with the hint if the sibling is still there, otherwise `appending`.

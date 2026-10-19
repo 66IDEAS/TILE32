@@ -132,6 +132,17 @@ extension LayoutEngine {
                 continue
             }
 
+            // Tabs: another tab of the same app took the window's place (new, closed or chosen tab).
+            for (old, new) in tabReplacements(in: tree, candidates: observed) {
+                tree = tree.replacing(old, with: new)
+                lastTile[new] = lastTile[old]
+                lastTile[old] = nil
+                retries[old] = nil
+                ignoredWrites.remove(old)
+                returnHints[new] = nil
+                Log.layout.info("Tab \(new.description, privacy: .public) takes the tile of \(old.description, privacy: .public)")
+            }
+
             // Departures: closed, minimised, hidden, full screen, moved to another desktop.
             for id in tree.windowIDs where !observedIDs.contains(id) {
                 if let pid = windowPIDs[id], observation.unansweredPIDs.contains(pid) { continue }
@@ -215,6 +226,27 @@ extension LayoutEngine {
         return summary
     }
 
+    /// Tabs (Finder, Safari, Terminal and others) are separate windows, and only the front
+    /// tab is listed. A new tab, a closed tab or another chosen tab replaces the listed window
+    /// by another window of the same app in the same frame. That window takes over the tile
+    /// instead of joining at the end (found by the owner on 2026-10-19: Cmd-T in Finder moved
+    /// Finder to the end of the layout). Returns pairs of the vanished and the new window.
+    func tabReplacements(in tree: LayoutTree, candidates: [WindowRecord]) -> [(old: WindowID, new: WindowID)] {
+        let listed = Set(candidates.map(\.id))
+        var free = candidates.filter { record in !trees.values.contains { $0.contains(record.id) } && !tree.contains(record.id) }
+        var result: [(old: WindowID, new: WindowID)] = []
+        for old in tree.windowIDs where !listed.contains(old) {
+            guard let pid = windowPIDs[old], let tile = lastTile[old],
+                  let index = free.firstIndex(where: { record in
+                      record.snapshot.app.pid == pid
+                          && record.snapshot.frame.map { Self.close($0, tile, tolerance: FrameWriteResult.stepTolerance) } == true
+                  }) else { continue }
+            result.append((old, free[index].id))
+            free.remove(at: index)
+        }
+        return result
+    }
+
     /// Why the reading belongs to a desktop switch in progress, or nil when it is consistent.
     /// macOS reports the new Space at once, but Accessibility lists the old desktop's windows
     /// for a moment and the new desktop's windows only afterwards. Taken as it is, such a
@@ -238,7 +270,12 @@ extension LayoutEngine {
         for display in observation.displays.displays {
             guard let current = observation.currentSpaces[display.id],
                   let tree = trees[LayoutKey(space: current.id, display: display.id)] else { continue }
-            for id in tree.windowIDs where !listed.contains(id) {
+            let tiledHere = observation.records.filter {
+                $0.display == display.id && WindowClassifier.classify($0.snapshot) == .tiled
+            }
+            // A tab hidden behind another tab stays on the desktop without being listed.
+            let replacedTabs = Set(tabReplacements(in: tree, candidates: tiledHere).map(\.old))
+            for id in tree.windowIDs where !listed.contains(id) && !replacedTabs.contains(id) {
                 if let pid = windowPIDs[id], observation.unansweredPIDs.contains(pid) || observation.hiddenPIDs.contains(pid) {
                     continue
                 }

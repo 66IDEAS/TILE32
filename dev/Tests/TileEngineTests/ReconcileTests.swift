@@ -37,6 +37,8 @@ private final class World: FrameWriting, @unchecked Sendable {
         /// after moving to the Retina display (macOS itself had fitted the height to the
         /// smaller display). `Int.max` ignores widths for ever.
         var ignoredSizeWrites = 0
+        /// A tab behind another tab: on its desktop, but not listed by Accessibility.
+        var backgroundTab = false
     }
 
     private let lock = NSLock()
@@ -64,7 +66,7 @@ private final class World: FrameWriting, @unchecked Sendable {
     func observe(space: SpaceInfo = desktop2, displays: DisplayTable = bothDisplays, recency: [UInt64] = [],
                  unanswered: Set<pid_t> = [], hidden: Set<pid_t> = []) -> Observation {
         let snapshot = lock.withLock { windows }
-        let records = snapshot.filter { $0.value.space == space.id || $0.value.minimised }.map { number, window in
+        let records = snapshot.filter { ($0.value.space == space.id || $0.value.minimised) && !$0.value.backgroundTab }.map { number, window in
             let snap = WindowSnapshot(
                 app: AppInfo(pid: window.pid, bundleID: window.bundleID, name: "App \(window.pid)"),
                 element: AXElementBox(AXUIElementCreateApplication(pid_t(number))),
@@ -470,6 +472,56 @@ struct MidSwitchTests {
         let summary = await engine.reconcile(reading, acceptMidSwitch: true)
         #expect(!summary.heldMidSwitch)
         #expect(summary.departed == 3)
+    }
+}
+
+@Suite("Tabs replace each other in one tile")
+struct TabTests {
+    /// Three windows on desktop 2; the middle one is a Finder window (pid 200).
+    private func setUp() async -> (World, LayoutEngine) {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500, pid: 200); world.add(3, x: 3000)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        return (world, engine)
+    }
+
+    private func reading(_ world: World) -> Observation {
+        var observation = world.observe()
+        observation.knownSpaces = Dictionary(uniqueKeysWithValues: [1, 2, 3, 9].compactMap { n in
+            world.window(n).map { (WindowID(n), [$0.space]) }
+        })
+        return observation
+    }
+
+    @Test func aNewTabTakesTheTileOfTheTabBehindIt() async {
+        let (world, engine) = await setUp()
+        let tile = world.window(2)!.frame
+        // Cmd-T: a new window in the same frame, the old tab goes behind it.
+        world.add(9, x: tile.minX, y: tile.minY, width: tile.width, pid: 200)
+        world.update(9) { $0.frame = tile }
+        world.update(2) { $0.backgroundTab = true }
+        let writes = world.writes
+        let summary = await engine.reconcile(reading(world))
+        #expect(!summary.heldMidSwitch)
+        #expect(ids(await engine.trees[key2]) == [1, 9, 3])
+        #expect(world.writes == writes)
+        // Choosing the first tab again swaps back, still in the same place.
+        world.update(2) { $0.backgroundTab = false }
+        world.update(9) { $0.backgroundTab = true }
+        _ = await engine.reconcile(reading(world))
+        #expect(ids(await engine.trees[key2]) == [1, 2, 3])
+        #expect(world.writes == writes)
+    }
+
+    @Test func anotherAppsWindowInTheSameFrameDoesNotTakeTheTile() async {
+        let (world, engine) = await setUp()
+        let tile = world.window(2)!.frame
+        world.remove(2)   // Finder window closed
+        world.add(9, x: tile.minX, pid: 300)
+        world.update(9) { $0.frame = tile }
+        _ = await engine.reconcile(reading(world))
+        #expect(ids(await engine.trees[key2]) == [1, 3, 9])
     }
 }
 
