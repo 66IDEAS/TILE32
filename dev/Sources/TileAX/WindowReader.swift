@@ -51,6 +51,12 @@ public struct AppReadResult: Sendable {
     public let windows: [WindowSnapshot]
     public let error: AXError
     public let duration: Duration
+
+    /// True when the app's window list could not be read. Its windows then keep their tiles
+    /// instead of counting as closed (TA-13). Any error counts, not only a timeout: on
+    /// 2026-10-19 Claude and WhichSpace answered with -25211 for a while, their windows were
+    /// dropped from the layout, and the other windows grew over them.
+    public var listingFailed: Bool { error != .success && error != .noValue }
 }
 
 public enum WindowReader {

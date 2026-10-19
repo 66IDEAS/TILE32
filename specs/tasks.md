@@ -299,6 +299,8 @@ Goal: windows arrange themselves, every Space on every display keeps its own arr
 - **Done when:** 10 minutes of the FakeWindows stress mode show no layout loop and no lost window, and the result is in `specs/spikes.md`.
 - **Depends on:** T-1.10
 - **Result:** passed on 2026-10-18 with a generated 6-minute stress script (254 actions); no loop, no lost window, clean end state (`specs/spikes.md`, S4). The planned 10 minutes were shortened to the time the owner was away. Done.
+- **Errors found:** in the owner's use on 2026-10-19, desktop 2 ended up with windows on top of each other. From 11:27 the installed release got AXError -25211 when listing the windows of Claude and WhichSpace (another process read them without trouble; the privacy log showed nothing). Only -25204 counted as "did not answer", so Claude's three windows were treated as closed, their tiles went to the other windows, and those grew over them. Fixed: any error while listing an app's windows (`AppReadResult.listingFailed`) keeps that app's windows in their tiles. 6 test cases. The cause of the -25211 errors is still open; a restart of TILE32 is expected to clear it.
+
 
 ### [x] T-1.14 Window limit while tiling automatically
 - **Do:** Track focus for the recency order (`kAXFocusedWindowChanged`, app activation). Swap in a window that TILE32 minimised when the user brings it back, give new windows a tile on a full layout, bring back windows when a tile frees up, apply limit changes at once, never touch windows the user minimised, and suppress TILE32's own minimise notifications.

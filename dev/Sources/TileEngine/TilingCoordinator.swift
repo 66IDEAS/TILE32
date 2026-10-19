@@ -260,7 +260,7 @@ public final class TilingCoordinator {
         let apps = apps()
         let table = displays()
         let scan = await WindowScan.run(apps: apps, displays: table, spaceService: spaceService)
-        let unanswered = Set(scan.apps.filter { $0.error == .cannotComplete }.map(\.app.pid))
+        let unanswered = Set(scan.apps.filter(\.listingFailed).map(\.app.pid))
         let hidden = Set(NSWorkspace.shared.runningApplications.filter(\.isHidden).map(\.processIdentifier))
         let recency = WindowServerList.frontToBack().map { WindowID(UInt64($0)) }
         let pids = Set(apps.map(\.pid))
