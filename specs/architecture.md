@@ -518,8 +518,9 @@ dev/
     TileCoreTests/
     TileGeometryTests/
     TileEngineTests/
-  THIRD_PARTY_NOTICES.md        licences and attribution for any code taken from other open-source projects
 ```
+
+The repository root holds `README.md`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` and `THIRD_PARTY_NOTICES.md` (licences and attribution for any code taken from other open-source projects). Brand assets (app icon, 66ideas logo) live in `dev/Resources/Brand/`, copied from the 66ideas brand kit by `dev/sync-brand.sh`; the help page lives in `dev/Resources/Help/`.
 
 ---
 
