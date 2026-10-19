@@ -17,6 +17,8 @@ public struct DropPreview: Sendable, Equatable {
 
 public enum DropOutcome: Sendable, Equatable {
     case swapped, split, movedToEmptyDisplay
+    /// A full-height column at the left or right display edge (US-32).
+    case placedAtDisplayEdge
     /// No target under the cursor, or the window is not tiled: it goes back to its tile.
     case snappedBack
     case ignored
@@ -78,6 +80,14 @@ extension LayoutEngine {
             trees[source] = Self.nonEmpty(sourceTree.removing(dragged))
             trees[preview.key] = LayoutTree(root: .leaf(dragged))
             outcome = .movedToEmptyDisplay
+        case .displayEdge(let edge, _):
+            if preview.key == source {
+                trees[source] = sourceTree.placing(dragged, atDisplayEdge: edge)
+            } else {
+                trees[source] = Self.nonEmpty(sourceTree.removing(dragged))
+                trees[preview.key] = (trees[preview.key] ?? LayoutTree()).placing(dragged, atDisplayEdge: edge)
+            }
+            outcome = .placedAtDisplayEdge
         }
         let batch = frameBatch(displays: displays, currentSpaces: currentSpaces, snapshots: snapshots, force: [dragged])
         let written = await apply(batch)

@@ -384,6 +384,13 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Depends on:** T-2.6
 - **Result:** "Make sizes equal" below "Tile now" (grey while paused) equalises every shown layout without changing the arrangement (`equalizeShown`); the Windows submenu shows each window's share of its display width, rounded to whole percent, when the display holds more than one window (test). Done 2026-10-18.
 
+### [x] T-2.10 Full-height column at the display edge
+- **Do:** A 40 point band along the left and right edges of each display's usable area is a drop target: the window leaves its place and becomes a full-height column at that edge with an equal share (`LayoutTree.placing(_:atDisplayEdge:)`, `DropTarget.displayEdge`, labels "Full height on the left" and "Full height on the right"). No band at the top and bottom.
+- **Traces:** US-32, UX-11, UX-15
+- **Done when:** dropping ChatGPT at the right edge of the owner's four-by-two grid on desktop 2 gives it the full height on the right, and the other windows keep their columns.
+- **Progress:** done on 2026-10-19 at the owner's request. 6 core tests (tree operation, band boundaries, preview area) and 2 engine tests (own display, from the other display). Two older drop tests pointed 10 to 20 points inside the leftmost window, now inside the band; they moved just outside it. macOS edge tiling ("Drag windows to screen edges to tile") is off on the owner's Mac, so it does not compete with the band. Waiting for the owner to try it.
+- **Depends on:** T-2.3
+
 ### [ ] T-2.8 [owner] Spike session D: live resize (S7)
 - **Do:** The owner resizes edges between Safari, Chrome, VS Code, Terminal and Slack on the ultrawide. Claude reads the timings per app.
 - **Traces:** S7, Q-13, OQ-9

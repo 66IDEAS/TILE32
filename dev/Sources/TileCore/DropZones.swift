@@ -9,12 +9,23 @@ public enum DropZoneGeometry {
     public static let centerHigh: CGFloat = 0.72
 }
 
+/// The band along the left and right display edges in which a drop makes a full-height
+/// column (US-32). Measured from the edge of the usable area, so it includes the gap.
+/// There is no band at the top and bottom: while a window is dragged along the top row,
+/// the pointer is at title-bar height right below the menu bar and would hit it by accident.
+public enum DisplayEdgeGeometry {
+    public static let band: CGFloat = 40
+}
+
 /// What the overlay shows and what a release does.
 public enum DropTarget: Equatable, Sendable {
     /// A window under the cursor, the zone, and the window's raw tile.
     case window(WindowID, DropZone, tile: CGRect)
     /// A layout with no window other than the dragged one: "Move to this display".
     case emptyLayout(CGRect)
+    /// The left or right display edge: the window becomes a full-height column there
+    /// (US-32). `area` is the column it would get.
+    case displayEdge(Edge, area: CGRect)
 }
 
 /// The zone of a point inside a tile. Outside the centre, the nearest edge wins; ties
@@ -41,6 +52,8 @@ public func previewRect(for target: DropTarget) -> CGRect {
     switch target {
     case .emptyLayout(let rect):
         return rect
+    case .displayEdge(_, let area):
+        return area
     case .window(_, let zone, let tile):
         switch zone {
         case .center: return tile
@@ -58,6 +71,16 @@ extension LayoutTree {
     public func dropTarget(at point: CGPoint, in rect: CGRect, excluding dragged: WindowID?) -> DropTarget? {
         guard rect.contains(point) else { return nil }
         guard windowIDs.contains(where: { $0 != dragged }) else { return .emptyLayout(rect) }
+
+        let band = DisplayEdgeGeometry.band
+        let edge: Edge? = point.x < rect.minX + band ? .left : point.x >= rect.maxX - band ? .right : nil
+        if let edge {
+            let placeholder = dragged ?? WindowID(UInt64.max)
+            let placed = placing(placeholder, atDisplayEdge: edge)
+            if let area = placed.rawShares(in: rect).first(where: { $0.0 == placeholder })?.1 {
+                return .displayEdge(edge, area: area)
+            }
+        }
 
         for (id, tile) in rawShares(in: rect) where id != dragged {
             if point.x >= tile.minX, point.x < tile.maxX, point.y >= tile.minY, point.y < tile.maxY {

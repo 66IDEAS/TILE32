@@ -633,6 +633,33 @@ struct DropTests {
         #expect(await !engine.needsWriteRetry)
     }
 
+    @Test func dropAtTheRightDisplayEdgeMakesAFullHeightColumn() async {
+        let world = World()
+        for n in 1...8 { world.add(UInt64(n), x: CGFloat(n) * 500) }
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        #expect(shape(await engine.trees[key2]!) == "H(V(1,5),V(2,6),V(3,7),V(4,8))")
+        let outcome = await engine.drop(WindowID(3), at: CGPoint(x: 5100, y: 700), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .placedAtDisplayEdge)
+        #expect(shape(await engine.trees[key2]!) == "H(V(1,5),V(2,6),7,V(4,8),3)")
+        let frame = world.window(3)!.frame
+        #expect(frame.maxX == 5120 - LayoutEngine.gap)
+        #expect(frame.minY == 30 + LayoutEngine.gap && frame.maxY == 30 + 1353 - LayoutEngine.gap)
+    }
+
+    @Test func dropAtTheLeftEdgeOfAnotherDisplayMovesTheWindowThere() async {
+        let world = World()
+        world.add(1, x: 100); world.add(2, x: 1500); world.add(9, x: -1500, y: 400, width: 600)
+        let engine = LayoutEngine(writer: world)
+        _ = await engine.reconcile(world.observe())
+        let outcome = await engine.drop(WindowID(9), at: CGPoint(x: 10, y: 700), displays: bothDisplays,
+                                        currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
+        #expect(outcome == .placedAtDisplayEdge)
+        #expect(ids(await engine.trees[key2]) == [9, 1, 2])
+        #expect(await engine.trees[LayoutKey(space: SpaceID(4), display: laptop)] == nil)
+    }
+
     @Test func swapAcrossDisplaysExchangesBothWindows() async {
         let world = World()
         world.add(1, x: 100); world.add(2, x: 1500); world.add(9, x: -1000, y: 400, width: 600)
@@ -653,7 +680,7 @@ struct DropTests {
         let engine = LayoutEngine(writer: world)
         _ = await engine.reconcile(world.observe())
         let laptopTile = world.window(9)!.frame
-        let outcome = await engine.drop(WindowID(2), at: CGPoint(x: laptopTile.minX + 20, y: laptopTile.midY), displays: bothDisplays,
+        let outcome = await engine.drop(WindowID(2), at: CGPoint(x: laptopTile.minX + DisplayEdgeGeometry.band + 20, y: laptopTile.midY), displays: bothDisplays,
                                         currentSpaces: current(desktop2), snapshots: snapshots(world.observe()))
         #expect(outcome == .split)
         #expect(ids(await engine.trees[key2]) == [1])
@@ -671,7 +698,7 @@ struct DropTests {
     @Test func previewMatchesTheZone() async {
         let (world, engine) = await setUp()
         let a = world.window(1)!.frame
-        let preview = await engine.dropPreview(for: WindowID(3), at: CGPoint(x: a.minX + 10, y: a.midY),
+        let preview = await engine.dropPreview(for: WindowID(3), at: CGPoint(x: a.minX + DisplayEdgeGeometry.band + 10, y: a.midY),
                                                displays: bothDisplays, currentSpaces: current(desktop2))
         guard case .window(let target, let zone, _)? = preview?.target else { Issue.record("no preview"); return }
         #expect(target == WindowID(1))

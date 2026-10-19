@@ -50,7 +50,7 @@ These rules define how a layout behaves. They match the interactive reference pr
 
 ## 5. User stories
 
-Stories are grouped by release slice. A slice is finished when all its stories pass their acceptance criteria. Story numbers are stable identifiers: stories added during review (US-28 to US-31) keep their numbers and are placed in the milestone where they belong.
+Stories are grouped by release slice. A slice is finished when all its stories pass their acceptance criteria. Story numbers are stable identifiers: stories added during review (US-28 to US-31) and later (US-32) keep their numbers and are placed in the milestone where they belong.
 
 ---
 
@@ -270,7 +270,7 @@ Goal: the user arranges windows by dragging them, as in the interactive prototyp
 2. A short label names the action: "Swap places", "Place on the left", "Place on the right", "Place above" or "Place below".
 3. The highlight and label update continuously as the mouse moves between zones and between windows.
 4. When the mouse is over a display that has no tiled window at all, the whole usable area of that display is highlighted with the label "Move to this display" (see US-18).
-5. Otherwise, when the mouse is not over any tiled window, no highlight is shown.
+5. Otherwise, when the mouse is not over any tiled window and not in the band at the left or right display edge (US-32), no highlight is shown.
 6. The highlight does not block the mouse or hide the windows underneath.
 
 #### US-17 Cancel a drag
@@ -303,6 +303,19 @@ Goal: the user arranges windows by dragging them, as in the interactive prototyp
 2. A tiled window whose outer edge (the edge that touches the display border) the user drags returns to its tile, because there is no neighbour to give space to. Resizing between two windows is described in US-28.
 3. A tiled window that its app resizes by itself, without the user dragging, returns to its tile once (see US-10 for windows that refuse).
 4. The return happens within one second of release.
+
+#### US-32 Full-height column at the display edge
+
+**Description:** As a user, I want to drop a window at the left or right edge of a display and have it fill the whole height there, so I can keep one window beside all the others without rearranging them one by one.
+
+**Acceptance criteria:**
+1. While a window is dragged within 40 points of the left or right edge of a display's usable area, the highlight shows the column the window would get, labelled "Full height on the left" or "Full height on the right".
+2. On release, the window leaves its old place (its neighbours re-flow, rule L4) and becomes a full-height column at that edge. It gets an equal share of the width, and the other columns shrink in proportion, as in rule L3.
+3. This works on the window's own display and on another display, also when the layout is in two rows: then the rows move together into one column beside the new one.
+4. There is no such band at the top and bottom edges, because the pointer passes there while a window is dragged along the top row.
+5. The band takes precedence over the zones of the window below it.
+
+*Added on 2026-10-19 at the owner's request, after a full-height window on the right could not be reached from a grid of two rows.*
 
 #### US-28 Resize by dragging an edge
 

@@ -276,13 +276,14 @@ A status line text stays until the state changes. It is not timed, so there is n
 ### UX-11 Drop-zone overlay: behaviour and wording
 
 **Description:**
-- The highlight is shown while the mouse is over a tiled window other than the dragged one, or over a display that has no tiled window at all (then the whole usable area is highlighted). Anywhere else nothing is shown, and releasing there cancels the drag (US-17).
+- The highlight is shown while the mouse is over a tiled window other than the dragged one, in the band along the left or right display edge, or over a display that has no tiled window at all (then the whole usable area is highlighted). Anywhere else nothing is shown, and releasing there cancels the drag (US-17).
 - The highlight follows the mouse continuously and switches at once when the mouse crosses from one zone to another or from one window to another, also across displays.
 - The overlay never takes mouse clicks and never takes keyboard focus, and it appears above normal windows but not above menus.
-- The six labels, exactly: "Swap places", "Place on the left", "Place on the right", "Place above", "Place below", "Move to this display".
+- The eight labels, exactly: "Swap places", "Place on the left", "Place on the right", "Place above", "Place below", "Move to this display", "Full height on the left", "Full height on the right".
+- Within 40 points of the left or right edge of a display, the highlight shows the full-height column the window would get (US-32). This band wins over the zones of the window below it.
 - The centre zone is the middle 44 percent of the tile in both directions, as in the prototype. Its size is a single constant that can be adjusted after real use (spec question Q-10).
 
-**Serves:** US-14, US-15, US-16, US-17, US-18
+**Serves:** US-14, US-15, US-16, US-17, US-18, US-32
 
 ### UX-12 Look of tiled windows
 
@@ -360,6 +361,7 @@ A status line text stays until the state changes. It is not timed, so there is n
 | Place above | Overlay label |
 | Place below | Overlay label |
 | Move to this display | Overlay label, display without a tiled window |
+| Full height on the left, Full height on the right | Overlay labels, band at the left or right display edge (US-32) |
 | To arrange your windows, macOS must let TILE32 control them. TILE32 only reads window positions, sizes and titles. It never records your screen, reads what is in a window, or uses the internet. | First-run alert, first paragraph |
 | In System Settings, open Privacy & Security > Accessibility and switch on TILE32. You do not need to restart it. | First-run alert, second paragraph |
 | TILE32 starts paused. When you are ready, choose Resume tiling from its menu. | First-run alert, third paragraph |
@@ -478,5 +480,6 @@ Numbered UQ-n to keep them apart from the specification's Q-n and the architectu
 | US-27 Permission revoked or lost | UX-2, UX-5, UX-9 |
 | US-28 Resize by dragging an edge | UX-6, UX-13, UX-16 |
 | US-31 Window limit per display | UX-6, UX-9, UX-17 |
+| US-32 Full-height column at the display edge | UX-10, UX-11 |
 
 Stories that have no visible interface of their own (US-7, US-8, US-9, US-11, US-26, US-29, US-30) are not listed: their behaviour shows only through the layout itself.

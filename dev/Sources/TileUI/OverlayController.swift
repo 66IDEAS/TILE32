@@ -17,6 +17,7 @@ public final class OverlayController {
     public static func label(for target: DropTarget) -> String {
         switch target {
         case .emptyLayout: "Move to this display"
+        case .displayEdge(let edge, _): edge == .left ? "Full height on the left" : "Full height on the right"
         case .window(_, let zone, _):
             switch zone {
             case .center: "Swap places"

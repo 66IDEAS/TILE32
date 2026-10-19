@@ -33,6 +33,26 @@ extension LayoutTree {
         return LayoutTree(root: .split(.horizontal, children))
     }
 
+    /// Places the window as a full-height column at the left or right display edge, or a
+    /// full-width row at the top or bottom (US-32). It leaves its old place first, then gets
+    /// an equal share, and the other columns shrink in proportion, as in rule L3.
+    public func placing(_ id: WindowID, atDisplayEdge edge: Edge) -> LayoutTree {
+        let base = removing(id)
+        guard let root = base.root else { return LayoutTree(root: .leaf(id)) }
+        let direction: SplitDirection = edge == .left || edge == .right ? .horizontal : .vertical
+        let children: [SplitChild]
+        if case .split(let existing, let list) = root, existing == direction {
+            children = list
+        } else {
+            children = [SplitChild(root, weight: 1)]
+        }
+        let count = Double(children.count)
+        let scaled = children.map { SplitChild($0.node, weight: $0.weight * count / (count + 1)) }
+        let new = SplitChild(.leaf(id), weight: 1 / (count + 1))
+        let ordered = edge == .left || edge == .top ? [new] + scaled : scaled + [new]
+        return LayoutTree(root: .split(direction, ordered)).normalized()
+    }
+
     /// Removes the window. Its siblings grow in proportion (rule L4).
     public func removing(_ id: WindowID) -> LayoutTree {
         guard contains(id) else { return self }
