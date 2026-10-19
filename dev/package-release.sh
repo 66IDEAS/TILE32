@@ -7,7 +7,7 @@
 #   3. signs, notarizes and staples the DMG, and checks it with Gatekeeper
 #   4. writes a ZIP of the app and SHA256SUMS beside the DMG
 #
-# Output: build/release/dist/TILE32-<version>-arm64.dmg, .zip and SHA256SUMS.
+# Output: build/release/dist/<version>/TILE32-<version>-arm64.dmg, .zip and SHA256SUMS.
 # Existing files are never overwritten: a corrected release needs a new version.
 # Needs the keychain profile TILE32 (see build-app.sh); credentials never go into the repository.
 set -euo pipefail
@@ -16,12 +16,13 @@ cd "$(dirname "$0")"
 IDENTITY="Developer ID Application: Alexander Ilg (AHBM4Y6VPX)"
 NOTARY_PROFILE="${TILE32_NOTARY_PROFILE:-TILE32}"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
-DIST="build/release/dist"
+# One folder per version, so the checksums of one release never overwrite another's.
+DIST="build/release/dist/$VERSION"
 NAME="TILE32-$VERSION-arm64"
 DMG="$DIST/$NAME.dmg"
 ZIP="$DIST/$NAME.zip"
 
-if [ -e "$DMG" ] || [ -e "$ZIP" ]; then
+if [ -e "$DMG" ] || [ -e "$ZIP" ] || [ -e "$DIST/SHA256SUMS" ]; then
     echo "$DIST already holds a release $VERSION. Raise the version instead of overwriting it." >&2
     exit 1
 fi
