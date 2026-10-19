@@ -5,10 +5,11 @@
 # the kit is regenerated.
 #
 # Usage: ./sync-brand.sh [path to the brand kit]
+# The path can also come from TILE32_BRAND_KIT. The kit itself is not part of this repository.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-KIT="${1:-/Users/alexanderilg/dev/git/66ideas/03-brand/kit}"
+KIT="${1:-${TILE32_BRAND_KIT:-$HOME/dev/git/66ideas/03-brand/kit}}"
 ICNS="$KIT/app-icons/tile32/TILE32.icns"
 [ -f "$ICNS" ] || { echo "No app icon found at $ICNS" >&2; exit 1; }
 

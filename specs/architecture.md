@@ -494,7 +494,7 @@ Other known risks: apps that fight window placement (some games, some Electron a
 
 ---
 
-## 5. Repository layout (under `/Volumes/sdcard/git/TILE32/dev`)
+## 5. Repository layout (under `dev/`)
 
 ```
 dev/
