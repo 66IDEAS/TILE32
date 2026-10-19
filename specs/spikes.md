@@ -103,15 +103,7 @@ Run with the debug build logging every Space switch. Window titles are not recor
 
 ## Space UUIDs before a logout (2026-10-18, for the S6 question "do UUIDs survive a logout")
 
-| Space | Type | Desktop | UUID |
-|---|---|---|---|
-| 3 | desktop | 1 | (desktop UUID removed) |
-| 4 | desktop | 2 | (desktop UUID removed) |
-| 5 | desktop | 3 | (desktop UUID removed) |
-| 6 | desktop | 4 | (desktop UUID removed) |
-| 7 | desktop | 5 | (desktop UUID removed) |
-| 8 | desktop | 6 | (desktop UUID removed) |
-| 9 | desktop | 7 | (desktop UUID removed) |
+The UUIDs of the seven desktops were recorded on the owner's Mac. They are machine identifiers, so the table is kept locally and not published.
 
 After the owner's next logout or restart, "Log Spaces" is compared with this table.
 
