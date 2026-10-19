@@ -67,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 tileNow: { [weak self] in self?.tileNowFromMenu() },
                 makeSizesEqual: { [weak self] in
                     guard let coordinator = self?.coordinator else { return }
+                    Log.ui.info("Make sizes equal chosen from the menu")
                     Task { await coordinator.makeSizesEqual() }
                 },
                 menuWillOpen: { [weak self] in self?.refreshWindowMenu() },
@@ -265,12 +266,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// "Tile now" (US-4.6): arranges the shown desktops afresh; tiling keeps running.
     private func tileNowFromMenu() {
+        Log.ui.info("Tile now chosen from the menu")
         guard let coordinator, coordinator.state == .running else { return }
         Task { _ = await coordinator.tileNow() }
     }
 
     /// "Untile" (US-24): restores every window, then pauses (US-24.4).
     private func untileFromMenu() {
+        Log.ui.info("Untile chosen from the menu")
         Task {
             coordinator?.setState(.paused)
             runStateStore.setPaused(true)
