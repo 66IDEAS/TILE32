@@ -8,6 +8,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2E62E8" alt="MIT license"></a>
   <a href="specs/specifications.md"><img src="https://img.shields.io/badge/spec-complete-2E62E8" alt="Specification complete"></a>
+  <a href="https://github.com/66IDEAS/TILE32/releases/latest"><img src="https://img.shields.io/github/v/release/66IDEAS/TILE32?color=2E62E8" alt="Latest release"></a>
   <a href="https://66ideas.com"><img src="https://img.shields.io/badge/by-66IDEAS-16181D" alt="By 66IDEAS"></a>
 </p>
 
@@ -41,10 +42,12 @@ just as well on a laptop screen.
 
 ### Use the Mac app
 
-Requires **macOS 27 or later**. TILE32 is built and tested on Apple silicon.
+Requires **macOS 27 or later on an Apple-silicon Mac**.
 
-There is no public release yet. A signed and notarized build will be published
-as a GitHub Release. Until then, build a local copy.
+Download the signed and notarized DMG from the
+[latest GitHub Release](https://github.com/66IDEAS/TILE32/releases/latest).
+Open it and drag TILE32 into Applications. TILE32 does not check for updates
+itself; new versions appear on the releases page.
 
 TILE32 needs the Accessibility permission to move windows, and it starts paused.
 Choose "Resume tiling" in its menu bar menu to begin, and "TILE32 Help" for a

@@ -480,6 +480,7 @@ Goal: make TILE32 safe and pleasant for every day use.
 | D-7 | Window limit per display, configurable, default 12 on the Dell U4924DW and 6 on the laptop. Extra windows are minimised and swapped in when used (US-31, rule L9). Replaces former Q-3. | 2026-10-18 |
 | D-8 | "Tile now" uses two rows when equal columns would be narrower than 800 points (rule L2). Found in the M0 acceptance: 12 columns on the Dell were 420 points wide, and 6 of 12 windows could not shrink that far. | 2026-10-18 |
 | D-9 | New windows fill a second row when another column would be narrower than 800 points (rule L3). Found in the M1 acceptance (step 9): after the limit went from 3 back to 12, nine returning windows became 12 narrow columns. | 2026-10-18 |
+| D-10 | The first public release is version 0.32, published on GitHub as a signed and notarized DMG for Apple-silicon Macs. TILE32 has no update check: it makes no network calls (constitution), and new versions are downloaded from the releases page. | 2026-10-19 |
 
 ## 10. Open questions
 
