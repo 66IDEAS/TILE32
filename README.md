@@ -1,4 +1,9 @@
-<h1 align="center">TILE32</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="dev/Resources/Brand/tile32-dark.svg">
+    <img src="dev/Resources/Brand/tile32-light.svg" alt="TILE32" width="380">
+  </picture>
+</p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2E62E8" alt="MIT license"></a>
@@ -92,8 +97,8 @@ reports, proposed behavior changes, and building and testing.
 ## License
 
 [MIT](LICENSE). Free to use, modify, and distribute, including commercially,
-under the terms of the license. The app icon and the 66ideas logo are brand
-assets and are not covered by the license, see
+under the terms of the license. The app icon and the TILE32 and 66ideas logos are
+brand assets and are not covered by the license, see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---

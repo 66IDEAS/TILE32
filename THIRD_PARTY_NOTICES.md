@@ -14,6 +14,6 @@ removed.
 |---|---|---|---|
 | (none yet) | | | |
 
-The TILE32 app icon and the 66ideas logo in `dev/Resources/Brand/` are brand
+The TILE32 app icon, the TILE32 wordmark and the 66ideas logo in `dev/Resources/Brand/` are brand
 assets of 66ideas. They are not covered by the MIT License; forks must replace
 them with their own artwork.
