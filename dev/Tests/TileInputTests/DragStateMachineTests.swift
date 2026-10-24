@@ -85,13 +85,14 @@ struct DragStateMachineTests {
         #expect(outcomes == [.pressed, .movedOtherwise(reason: "not in lockstep with the cursor (window 300,0 cursor 10,0)")])
     }
 
-    @Test func lockstepMoveBelowTheBandIsReported() {
-        // For example a window moved by its toolbar below the 40 point band (OQ-4).
-        let (_, outcomes) = run([
+    @Test func lockstepMoveBelowTheBandIsADragToo() {
+        // For example a Finder window with tabs, grabbed in the tab bar below the 40 point band (OQ-4).
+        let (state, outcomes) = run([
             .press(press(at: CGPoint(x: 1200, y: 160))),
             .frameRead(frame.offsetBy(dx: 100, dy: 0), cursor: CGPoint(x: 1300, y: 160)),
         ])
-        #expect(outcomes == [.pressed, .movedOtherwise(reason: "outside the title band")])
+        #expect(outcomes == [.pressed, .startedDrag])
+        if case .dragging = state {} else { Issue.record("expected a drag") }
     }
 
     @Test func escapeCancelsAndReleaseDoesNotDrop() {

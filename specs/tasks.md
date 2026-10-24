@@ -342,6 +342,8 @@ Goal: the user arranges windows by dragging them and sizes them by dragging edge
 - **Done when:** title-bar drags are recognised in all S1 apps, and clicks, content drags and resizes are not.
 - **Depends on:** T-0.22, T-1.5
 - **Result:** the tracker now runs in every build while the permission is granted and reports drag moves and releases to the coordinator; drops run under the same lock as reconcile and use the last reading, so they do not wait for a new one. The element-at-position refinement was not needed (S1). Checked on 2026-10-18 with real mouse events on FakeWindows (owner away, with permission). Done.
+- **Errors found:** on 2026-10-24 the owner dragged a Finder window with tabs on desktop 2 onto a Claude window and no drop zone appeared. The new release log said "window moved, not a drag: outside the title band": the window moved in lockstep with the pointer, but the press was in the tab bar, below the 40 point title band. Apps with tall toolbars or tab bars (Finder with tabs, Safari, Outlook) were affected often. Fixed: a lockstep move is a layout drag wherever the window was grabbed (US-13.1, OQ-4 answered); the band is only logged. 1 test changed. Resolved 2026-10-24 in 0.32.4.
+
 
 ### [~] T-2.2 Drop-zone overlay
 - **Do:** One click-through, non-activating panel per display at `.floating` level, drawing the highlight (accent colour, 18 or 25 percent fill, 3 point border, 10 point radius, 3 point inset) and the label pill (13 point semibold). The six labels, wrapping and hiding rules, Increase Contrast variant, no animation, updates throttled to the display refresh rate.

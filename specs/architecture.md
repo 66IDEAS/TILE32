@@ -537,7 +537,7 @@ The layout logic is ported from the project's own prototype. If code or techniqu
 | OQ-1 | (Answered in session C: yes.) A global `keyDown` monitor for Escape works with the Accessibility permission alone on macOS 27. Escape cancel stays. | Answered 2026-10-18 |
 | OQ-2 | Project layout: SwiftPM-only with a build script (proposed), or a generated Xcode project (XcodeGen)? | SwiftPM plus `build-app.sh`, no extra tooling. |
 | OQ-3 | Should original frames be persisted to survive a crash? | No. Windows stay where they are after a crash, which is safe (N-5). |
-| OQ-4 | Is the title-bar band of 40 points right for apps with tall unified toolbars? Should the band be a setting? | Keep a constant, and rely on the lockstep rule as the real discriminator. Decide after S1. |
+| OQ-4 | (Answered 2026-10-24.) The 40 point title band missed Finder windows with tabs, whose tab bar lies below it. The lockstep rule alone decides: a window that moves with the cursor is a layout drag wherever it was grabbed. The band is kept for the log only. | Answered |
 | OQ-6 | Deployment target: macOS 27 only, or lower? | macOS 27 for version 1. |
 | OQ-7 | (Answered 2026-10-19: keep US-26.) Window identity after a restart of TILE32 is exact (window number); after a restart of the computer it is best effort (app, title hash, position). On the first visit of each desktop the order is: remembered layout that matches the screen, layout read back from the window frames (`LayoutTree.inferred`), remembered layout that moves windows back, fresh arrangement. | Answered |
 | OQ-9 | Are 30 live updates per second and the 50 ms slow-app threshold right for resizing (TA-25)? | Start with these values and tune them in spike S7. |

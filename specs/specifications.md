@@ -237,7 +237,7 @@ Goal: the user arranges windows by dragging them, as in the interactive prototyp
 **Description:** As a user, I want to pick up a window by its title bar and drag it, so that I can rearrange my layout with the mouse.
 
 **Acceptance criteria:**
-1. Pressing on a tiled window's title bar and moving the mouse starts a layout drag.
+1. Pressing on a tiled window's title bar, toolbar or tab bar and moving the mouse starts a layout drag: whenever macOS moves the window with the mouse, it is a layout drag (changed on 2026-10-24 after Finder windows with tabs were missed).
 2. Dragging by the window content, scrollbars or resize edges does not start a layout drag and keeps its normal behaviour.
 3. During the drag, the window follows the mouse like any normal window move, and the other windows stay where they are.
 4. A click on the title bar without moving (including double-click) does not change the layout.

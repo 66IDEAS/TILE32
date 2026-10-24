@@ -4,7 +4,8 @@ import CoreGraphics
 import Foundation
 
 public enum DragStateMachine {
-    /// The title-bar band: title bars and unified toolbars (TA-14, OQ-4).
+    /// The title-bar band: title bars and unified toolbars (TA-14). Only used for the log; a
+    /// drag is recognised by the window following the pointer (OQ-4).
     public static let titleBand: CGFloat = 40
     /// macOS places resize edges just outside a window's frame.
     public static let edgeMargin: CGFloat = 6
@@ -96,12 +97,13 @@ public enum DragStateMachine {
             let windowDelta = CGPoint(x: frame.minX - press.frame.minX, y: frame.minY - press.frame.minY)
             let cursorDelta = CGPoint(x: cursor.x - press.point.x, y: cursor.y - press.point.y)
             switch follow(window: windowDelta, cursor: cursorDelta) {
-            case .lockstep where press.inTitleBand:
+            // A window that moves exactly with the pointer is being dragged by the user, wherever it
+            // was grabbed: title bar, toolbar, tab bar. Requiring the top 40 points missed Finder
+            // windows with tabs and other tall toolbars (found on 2026-10-24, OQ-4 answered).
+            case .lockstep:
                 return (.dragging(press, cancelled: false), .startedDrag)
             case .lagging:
                 return (state, .none)
-            case .lockstep:
-                return (.idle, .movedOtherwise(reason: "outside the title band"))
             case .unrelated:
                 let detail = "window \(Int(windowDelta.x)),\(Int(windowDelta.y)) cursor \(Int(cursorDelta.x)),\(Int(cursorDelta.y))"
                 return (.idle, .movedOtherwise(reason: "not in lockstep with the cursor (\(detail))"))
