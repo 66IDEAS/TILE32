@@ -194,7 +194,15 @@ public final class MouseDragTracker {
         case .click: text = "click (window did not move)"
         case .movedOtherwise(let reason): text = "window moved, not a drag: \(reason)"
         }
-        guard let describe = self.describe else { return }
+        guard let describe = self.describe else {
+            // Release builds: the outcome with window number and process only, never a title.
+            // Presses and clicks are left out, they are too many.
+            switch outcome {
+            case .pressed, .click: break
+            default: Log.drag.notice("S1 w\(press.window) pid \(press.pid): \(text, privacy: .public)")
+            }
+            return
+        }
         Task {
             let info = await describe(press.window, press.pid)
             Log.drag.info("S1 w\(press.window) \(info, privacy: .public): \(text, privacy: .public)")

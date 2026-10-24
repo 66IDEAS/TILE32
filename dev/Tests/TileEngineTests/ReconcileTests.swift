@@ -733,6 +733,17 @@ struct DropTests {
         #expect(world.window(1)!.frame.width > 5000)
     }
 
+    @Test func missingDropZonesHaveAReason() async {
+        let (world, engine) = await setUp()
+        let own = world.window(2)!.frame
+        #expect(await engine.noDropPreviewReason(for: WindowID(2), at: CGPoint(x: own.midX, y: own.midY), displays: bothDisplays,
+                                                 currentSpaces: current(desktop2)) == "the pointer is over the window's own tile")
+        #expect(await engine.noDropPreviewReason(for: WindowID(77), at: CGPoint(x: 200, y: 200), displays: bothDisplays,
+                                                 currentSpaces: current(desktop2)) == "the window is in no layout of the shown desktops")
+        #expect(await engine.noDropPreviewReason(for: WindowID(2), at: CGPoint(x: 2000, y: 5), displays: bothDisplays,
+                                                 currentSpaces: current(desktop2)) == "the pointer is outside the usable area")
+    }
+
     @Test func floatingWindowsAreIgnored() async {
         let (world, engine) = await setUp()
         let outcome = await engine.drop(WindowID(77), at: CGPoint(x: 200, y: 200), displays: bothDisplays,

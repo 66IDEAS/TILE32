@@ -49,6 +49,19 @@ extension LayoutEngine {
         return DropPreview(target: target, key: key, area: previewRect(for: target))
     }
 
+    /// Why `dropPreview` found nothing, for the log (found on 2026-10-24: drop zones were often
+    /// missing and the release build could not say why).
+    public func noDropPreviewReason(for dragged: WindowID, at point: CGPoint, displays: DisplayTable,
+                                    currentSpaces: [DisplayID: SpaceInfo]) -> String {
+        guard shownKey(of: dragged, displays: displays, currentSpaces: currentSpaces) != nil else {
+            return "the window is in no layout of the shown desktops"
+        }
+        guard let display = displays.display(containing: point) else { return "the pointer is on no display" }
+        if currentSpaces[display.id]?.isFullScreen == true { return "the desktop is a full-screen Space" }
+        if !display.usableArea.contains(point) { return "the pointer is outside the usable area" }
+        return "the pointer is over the window's own tile"
+    }
+
     /// Applies a release at `point` (US-14, US-15, US-17, US-18) and writes the frames.
     /// `snapshots` holds the shown windows, so every affected window can be written.
     public func drop(_ dragged: WindowID, at point: CGPoint, displays: DisplayTable,

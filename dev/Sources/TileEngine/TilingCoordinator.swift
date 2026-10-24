@@ -63,13 +63,22 @@ public final class TilingCoordinator {
     /// displays offline and moves windows around; nothing is read or written then. After that
     /// TILE32 waits `screenReturnDelay` before it reads again (found on 2026-10-19: after an
     /// unlock the windows of desktop 2 were arranged afresh).
-    private var screenLocked = false
-    private var screensAsleep = false
-    private var sessionInactive = false
     private var readAgainAfter: ContinuousClock.Instant = .now - .seconds(10)
     private var distributedObservers: [NSObjectProtocol] = []
     static let screenReturnDelay: Duration = .seconds(2)
-    private var screenUnavailable: Bool { screenLocked || screensAsleep || sessionInactive }
+    /// Asked live from macOS on every check, so a missing "unlocked" notification can never
+    /// leave tiling stopped (found on 2026-10-24: drop zones were often missing, and macOS does
+    /// not always post "screen is unlocked" after a screen saver). The notifications only make
+    /// TILE32 look again sooner.
+    private var screenUnavailable: Bool { Self.screenUnavailableNow() }
+
+    static func screenUnavailableNow() -> Bool {
+        if let session = CGSessionCopyCurrentDictionary() as? [String: Any] {
+            if session["CGSSessionScreenIsLocked"] as? Bool == true { return true }
+            if session[kCGSessionOnConsoleKey as String] as? Bool == false { return true }
+        }
+        return CGDisplayIsAsleep(CGMainDisplayID()) != 0
+    }
     /// The last drag or resize step. Between the mouse-up and the drop taking the lock, a
     /// layout run must not start, or it puts the dragged window back first (found on
     /// 2026-10-19). Cleared when the gesture ends; ignored after `gestureTimeout` in case an
@@ -98,7 +107,7 @@ public final class TilingCoordinator {
     public func setState(_ newState: RunState) {
         guard newState != state else { return }
         state = newState
-        Log.engine.info("Run state: \(String(describing: newState), privacy: .public)")
+        Log.engine.notice("Run state: \(String(describing: newState), privacy: .public)")
         if newState == .running { trigger("resume") }
         onChange()
     }
@@ -148,23 +157,11 @@ public final class TilingCoordinator {
     }
 
     private func screenStateChanged(_ name: NSNotification.Name) {
-        let wasUnavailable = screenUnavailable
-        switch name.rawValue {
-        case "com.apple.screenIsLocked": screenLocked = true
-        case "com.apple.screenIsUnlocked": screenLocked = false
-        case NSWorkspace.screensDidSleepNotification.rawValue: screensAsleep = true
-        case NSWorkspace.screensDidWakeNotification.rawValue: screensAsleep = false
-        case NSWorkspace.sessionDidResignActiveNotification.rawValue: sessionInactive = true
-        case NSWorkspace.sessionDidBecomeActiveNotification.rawValue: sessionInactive = false
-        default: break
-        }
-        if screenUnavailable != wasUnavailable {
-            Log.engine.info("Screen \(self.screenUnavailable ? "unavailable (locked, asleep or another user): tiling waits" : "available again", privacy: .public)")
-        }
-        if wasUnavailable, !screenUnavailable {
-            readAgainAfter = .now + Self.screenReturnDelay
-            trigger("screen available again")
-        }
+        let unavailable = screenUnavailable
+        Log.engine.notice("\(name.rawValue, privacy: .public): screen \(unavailable ? "unavailable, tiling waits" : "available", privacy: .public)")
+        // Every one of these events may move displays and windows: read again only after a pause.
+        readAgainAfter = .now + Self.screenReturnDelay
+        if !unavailable { trigger("screen state changed") }
     }
 
     private func handle(_ event: WindowEvent) {
@@ -219,8 +216,15 @@ public final class TilingCoordinator {
                 scheduleCheck()
                 return
             }
-            // Nothing while the screen is locked or asleep; it is read once it is back.
-            if screenUnavailable { return }
+            // Nothing while the screen is locked or asleep; look again every second until it is back.
+            if screenUnavailable {
+                readAgainAfter = now + Self.screenReturnDelay
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1))
+                    self.scheduleCheck()
+                }
+                return
+            }
             if now < readAgainAfter {
                 scheduleCheck()
                 return
@@ -336,17 +340,41 @@ public final class TilingCoordinator {
 
     /// What a release at `point` would do, for the overlay (US-16). Nil while paused.
     public func dragMoved(_ number: CGWindowID, at point: CGPoint) async -> DropPreview? {
-        guard state == .running else { return nil }
+        guard state == .running else {
+            noteMissingPreview(number, "tiling is \(String(describing: state))")
+            return nil
+        }
         lastGestureStep = .now
         let table = displays()
-        return await engine.dropPreview(for: WindowID(UInt64(number)), at: point, displays: table,
-                                        currentSpaces: spaceService.currentSpaces(on: table))
+        let spaces = spaceService.currentSpaces(on: table)
+        let id = WindowID(UInt64(number))
+        if let preview = await engine.dropPreview(for: id, at: point, displays: table, currentSpaces: spaces) {
+            dragHadPreview = true
+            return preview
+        }
+        noteMissingPreview(number, await engine.noDropPreviewReason(for: id, at: point, displays: table, currentSpaces: spaces))
+        return nil
+    }
+
+    /// What the last drag showed, for the log: whether any zone appeared, and each new reason
+    /// why none did. Logged at notice level so it is still there when the owner reports it.
+    private var dragHadPreview = false
+    private var lastMissingPreviewReason: String?
+
+    private func noteMissingPreview(_ number: CGWindowID, _ reason: String) {
+        guard reason != lastMissingPreviewReason else { return }
+        lastMissingPreviewReason = reason
+        Log.drag.notice("No drop zone for w\(number): \(reason, privacy: .public)")
     }
 
     /// Applies a drop, or puts the window back after Escape (US-14 to US-19). Runs under the
     /// same lock as reconcile, so the two never interleave.
     public func dragEnded(_ number: CGWindowID, at point: CGPoint, cancelled: Bool) async {
-        defer { lastGestureStep = .now - .seconds(10) }
+        defer {
+            lastGestureStep = .now - .seconds(10)
+            dragHadPreview = false
+            lastMissingPreviewReason = nil
+        }
         guard state == .running else { return }
         while running { try? await Task.sleep(for: .milliseconds(20)) }
         running = true
@@ -364,7 +392,8 @@ public final class TilingCoordinator {
         if cancelled {
             await engine.snapBack(id, displays: table, currentSpaces: spaces, snapshots: snapshots)
         } else {
-            _ = await engine.drop(id, at: point, displays: table, currentSpaces: spaces, snapshots: snapshots)
+            let outcome = await engine.drop(id, at: point, displays: table, currentSpaces: spaces, snapshots: snapshots)
+            Log.drag.notice("Drop of w\(number): \(String(describing: outcome), privacy: .public), zone shown during the drag: \(self.dragHadPreview ? "yes" : "no", privacy: .public)")
         }
         lastWrite = .now
         await saveLayouts(observation)
@@ -375,6 +404,8 @@ public final class TilingCoordinator {
     /// A drag or resize ended without a release, for example by a desktop switch.
     public func gestureCancelled() {
         lastGestureStep = .now - .seconds(10)
+        dragHadPreview = false
+        lastMissingPreviewReason = nil
     }
 
     /// An edge resize moved or ended (US-28, TA-25). Returns the window's share for the label.
