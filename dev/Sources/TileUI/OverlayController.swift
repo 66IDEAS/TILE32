@@ -1,5 +1,7 @@
-// The drop-zone overlay (US-16, architecture TA-15, UX-10, UX-11): one transparent,
-// click-through panel per display that draws where a dragged window will go.
+// The drop-zone overlay (US-16, architecture TA-15, UX-10, UX-11): a transparent,
+// click-through panel on the display that draws where a dragged window will go. A panel lives
+// only while it is shown (found on 2026-11-05: after two days and several sleeps, a reused panel
+// was ordered front with the right frame but macOS kept it off screen, until a restart).
 import AppKit
 import TileCore
 import TileGeometry
@@ -31,7 +33,8 @@ public final class OverlayController {
 
     /// Shows the highlight for `area` (Accessibility coordinates) on its display, with a label.
     public func show(area: CGRect, label: String, on display: Display, table: DisplayTable) {
-        if let shownOn, shownOn != display.id { panels[shownOn]?.orderOut(nil) }
+        if let shownOn, shownOn != display.id { discardPanel(on: shownOn) }
+        let isNew = panels[display.id] == nil
         let panel = panels[display.id] ?? makePanel()
         panels[display.id] = panel
         let screenFrame = table.appKitRect(fromAX: display.frame)
@@ -43,6 +46,7 @@ public final class OverlayController {
         panel.orderFrontRegardless()
         shownOn = display.id
         announce(label)
+        if isNew { logIfOffScreen(panel, on: display.id) }
     }
 
     /// Only the label pill, centred in `area`, without a highlight: the share while resizing (UX-16).
@@ -53,10 +57,29 @@ public final class OverlayController {
     }
 
     public func hide() {
-        if let shownOn { panels[shownOn]?.orderOut(nil) }
+        if let shownOn { discardPanel(on: shownOn) }
         shownOn = nil
         lastAnnounced = ""
     }
+
+    private func discardPanel(on display: DisplayID) {
+        panels.removeValue(forKey: display)?.orderOut(nil)
+    }
+
+    /// Asks the window server whether the highlight really appeared. Logged at notice level, so
+    /// a missing zone can be told apart from one that was never calculated.
+    private func logIfOffScreen(_ panel: NSPanel, on display: DisplayID) {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.onScreenCheckDelay)
+            guard let self, self.panels[display] === panel else { return }
+            let info = CGWindowListCopyWindowInfo([.optionIncludingWindow], CGWindowID(panel.windowNumber)) as? [[String: Any]]
+            let onScreen = info?.first?[kCGWindowIsOnscreen as String] as? Bool == true
+            guard !onScreen else { return }
+            Log.ui.notice("Overlay w\(panel.windowNumber) is off screen: visible \(panel.isVisible, privacy: .public), on the active Space \(panel.isOnActiveSpace, privacy: .public), app hidden \(NSApp.isHidden, privacy: .public)")
+        }
+    }
+
+    private static let onScreenCheckDelay: Duration = .milliseconds(150)
 
     /// VoiceOver hears each new label once, politely (UX-14, UQ-2). The panel itself stays
     /// hidden from VoiceOver.
@@ -77,6 +100,7 @@ public final class OverlayController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
+        panel.animationBehavior = .none   // UX-10: no animation
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         panel.contentView = OverlayView()
         panel.setAccessibilityElement(false)

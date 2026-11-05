@@ -393,7 +393,7 @@ public final class TilingCoordinator {
             await engine.snapBack(id, displays: table, currentSpaces: spaces, snapshots: snapshots)
         } else {
             let outcome = await engine.drop(id, at: point, displays: table, currentSpaces: spaces, snapshots: snapshots)
-            Log.drag.notice("Drop of w\(number): \(String(describing: outcome), privacy: .public), zone shown during the drag: \(self.dragHadPreview ? "yes" : "no", privacy: .public)")
+            Log.drag.notice("Drop of w\(number): \(String(describing: outcome), privacy: .public), zone calculated during the drag: \(self.dragHadPreview ? "yes" : "no", privacy: .public)")
         }
         lastWrite = .now
         await saveLayouts(observation)
